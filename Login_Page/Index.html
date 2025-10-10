@@ -14,17 +14,21 @@
               <i class="fas fa-tasks"></i> Task Board
           </div>
           <nav class="nav">
-              <a href="Features">Features</a>
-              <a href="How it works">How it works</a>
-              <a href="Roles">Roles</a>
-              <a href="Status">Status</a>
-              <a href="Contacts">Contacts</a>
+              <a href="#features">Features</a>
+              <a href="#how-it-works">How it works</a>
+              <a href="#roles">Roles</a>
+              <a href="#Status">Status</a>
+              <a href="#Contacts">Contacts</a>
           </nav>
           
           <div class="user-section">
               <div class="-nav-left">
-                  <button class="signup-btn" onclick="signup()">Sign up</button>
+                <a href="signup.html">
+                  <button class="signup-btn">Sign up</button>
+                </a>
+                <a href="login.html">
                   <button class="login-btn" onclick="login()">Login</button>
+                </a>
               </div>
           </div>
       </header>
@@ -39,8 +43,12 @@
             <p>A modern solution for project management and <br> task tracking designed for academic teams and beyond.</p>
 
             <div class="buttons">
+              <a href="signup.html">
               <button class="btn btn-primary">Sign up</button>
+              </a>
+              <a href="">
               <button class="btn btn-secondary">Login</button>
+              </a>
             </div>
           </div>
 
@@ -176,7 +184,7 @@
 
 
 <!-- Task Board Example-->
- <div class="container-five">
+ <div class="container-five" id="Status">
             <div class="taskboard-header animate-on-scroll">
                 <h2>Task Status Overview</h2>
                 <p>Keep track of your tasks with status tracking system.</p>
@@ -299,11 +307,11 @@
             <div class="footer-section">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
-                  <li><a href="Features">Features</a></li>
-                  <li><a href="How it works">How it works</a>
-                  <li><a href="Roles">Roles</a></li>
-                  <li><a href="Status">Status</a></li>
-                  <li><a href="Contacts">Contacts</a></li>
+                  <li><a href="#features">Features</a></li>
+                  <li><a href="#how-it-works">How it works</a>
+                  <li><a href="#roles">Roles</a></li>
+                  <li><a href="#Status">Status</a></li>
+                  <li><a href="#Contacts">Contacts</a></li>
                 </ul>
             </div>
             <div class="footer-section">
@@ -322,5 +330,7 @@
             <p>© 2025 Task Board. All rights reserved.</p>
         </div>
     </footer>
+
+    
   </body>
 </html>
