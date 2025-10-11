@@ -203,7 +203,7 @@
             object-fit: contain;
              margin-left: -110px;
         }
-
+        
 
         /* Features Section */
         .features {
@@ -258,9 +258,8 @@
             align-items: center;
             justify-content: center;
             margin: 0 auto 1.5rem;
-            font-size: 3rem;
-            color: #667eea; 
-            background: white; 
+            background: #667eea; 
+            color: white;
             box-shadow: 0 8px 32px rgba(162, 176, 255, 0.3);
         }
 
@@ -624,27 +623,6 @@
 
         .footer-links li {
             margin-bottom: 8px;
-        }
-
-        .social-links {
-            display: flex;
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .social-link {
-            width: 32px;
-            height: 32px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-        }
-
-        .social-link:hover {
-            background: rgba(255,255,255,0.3);
         }
 
         .footer-bottom {
