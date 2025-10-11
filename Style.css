@@ -625,6 +625,12 @@
             margin-bottom: 8px;
         }
 
+        .social-links {
+            display: flex;
+            gap: 16px;
+            margin-top: 2px;
+        }
+
         .footer-bottom {
             text-align: center;
             margin-top: 32px;
