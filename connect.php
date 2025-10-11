@@ -1,15 +1,13 @@
 <?php
-// Enable errors for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Database connection
 $host = "localhost";
 $username = "root";
-$password = "";  // put your MySQL password here
+$password = "";
 $db = "taskboard_db";
-$port = 3306; // change if your MySQL port is different
+$port = 6969;
 
 $conn = mysqli_connect($host, $username, $password, $db, $port);
 

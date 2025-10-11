@@ -1,5 +1,6 @@
 <?php
-include('connect.php'); // your database connection file
+session_start();
+include('connect.php');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fullname = mysqli_real_escape_string($conn, $_POST['fullname']);
@@ -20,15 +21,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $result = mysqli_query($conn, $check_email);
 
     if (mysqli_num_rows($result) > 0) {
-        die("Email already registered. <a href='signup.html'>Try again</a>");
+        die("Email already registered. <a href='signup.html'>Try again</a> <br>
+        Try <a href='login.html'>Login </a>");
     }
 
     // Insert user into database with NULL role
     $insert_user = "INSERT INTO users (username, email, password, role) VALUES ('$fullname', '$email', '$hashed_password', NULL)";
 
     if (mysqli_query($conn, $insert_user)) {
-        // Redirect to login after successful signup
-        header("Location: login.html");
+        // ✅ FIXED: Set session and go to choose_role.php
+        $_SESSION['userid'] = mysqli_insert_id($conn);
+        $_SESSION['username'] = $fullname;
+        $_SESSION['role'] = NULL;
+        
+        header("Location: choose_role.php");
         exit();
     } else {
         die("Error: " . mysqli_error($conn));
