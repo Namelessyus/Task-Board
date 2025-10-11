@@ -1,3 +1,4 @@
+        /*Nav Bar*/
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -6,9 +7,22 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
 
         .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .logo a {
+            color: white;
+            text-decoration: none;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -51,6 +65,13 @@
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             min-height: 100vh;
         }
+
+
+        /*buttons for nav bar*/
+        .nav-left {
+            display: flex;
+            gap: 15px;
+        }
                 
         .signup-btn {
             background: rgba(255,255,255,0.2);
@@ -78,82 +99,6 @@
 
         .login-btn:hover {
             background: #613d84;
-        }
-
-
-        /* Header Navigation */
-        header {
-            background: #6366f1;
-            padding: 12px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: white;
-            font-size: 22px;
-            font-weight: 600;
-        }
-
-        .logo-icon {
-            font-size: 28px;
-        }
-
-        nav {
-            display: flex;
-            align-items: center;
-            gap: 35px;
-        }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            font-size: 15px;
-            transition: opacity 0.2s;
-        }
-
-        nav a:hover {
-            opacity: 0.8;
-        }
-
-        .nav-buttons {
-            display: flex;
-            gap: 18px;
-            margin-left: 20px;
-        }
-
-        .btn {
-            padding: 8px 24px;
-            border-radius: 6px;
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            border: none;
-            font-weight: 500;
-        }
-
-        .btn-signup {
-            background: white;
-            color: #6366f1;
-        }
-
-        .btn-signup:hover {
-            background: #f0f0f0;
-        }
-
-        .btn-login {
-            background: #7c3aed;
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-login:hover {
-            background: #6d28d9;
         }
 
 
@@ -201,7 +146,18 @@
         }
 
 
-        /*buttons*/
+        /*buttons for main page*/
+        .btn {
+            padding: 8px 24px;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            border: none;
+            font-weight: 500;
+        }
+
         .buttons {
             display: flex;
             gap: 15px;
@@ -227,12 +183,12 @@
         }
 
         .btn-secondary:hover {
-            background: #c7c7c7;
-            color: white;
+            background: #e2e2e2;
+            color: #6366f1;
         }
 
 
-        /* Picture */
+        /* Picture on the main page*/
         .pic {
             position: relative;       
             width: 450px;          
