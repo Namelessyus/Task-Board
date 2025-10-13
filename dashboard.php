@@ -15,3 +15,6 @@ if (!isset($_SESSION['role']) || empty($_SESSION['role'])) {
 $username = $_SESSION['username'];
 $role = $_SESSION['role'];
 ?>
+
+
+<a href="create_project.php">for creating project</a>
