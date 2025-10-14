@@ -20,7 +20,7 @@ $role = $_SESSION['role'];
 <!DOCTYPE html>
 <html>
   <head>
-        <link rel="stylesheet" href="Style.css">
+        <link rel="stylesheet" href="Dashboard.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
@@ -45,7 +45,27 @@ $role = $_SESSION['role'];
             </a>
     </header>
 
+    
 
+             <!-- Content Area -->
+        <main class="content">
+            <div class="content-header">
+                <div class="search-bar">
+                    <span class="search-icon">
+                        <i class="fas fa-search search-icon"></i>
+                    </span>
+                    <input type="text" placeholder="Search tasks, projects, or team members..." onkeyup="searchTasks(this.value)">
+                </div>
+                <div class="action-buttons">
+                    <?php if($role == "supervisor") { ?>
+                        <a href="create_project.php" class="btn btn-primary">Create Project</a>
+                    <?php } ?>
+                    <button class="btn btn-warning" onclick="addTask()">Add Task</button>
+                </div>
+            </div>
+
+            <h1 class="project-title">Welcome to Your Dashboard, <?php echo htmlspecialchars($username); ?>!</h1>
+            <p style="color: #666; margin-bottom: 20px;">Role: <strong><?php echo ucfirst($role); ?></strong></p>
     
     <!-- Footer -->
     <footer class="footer">
@@ -65,6 +85,12 @@ $role = $_SESSION['role'];
                     <li><a href="#" onclick="switchToTeam()">Team</a></li>
                 </ul>
             </div>
+
+
+
+
+
+
                         <div class="footer-section">
                 <h3>Contact Us</h3> <p><i class="fa fa-envelope" style="font-size:16px"></i> contact@taskboard.com</p>
     <p><i class="fa fa-phone" style="font-size:16px"></i> +977 1234567891</p>
