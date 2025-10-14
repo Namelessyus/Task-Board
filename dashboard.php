@@ -40,9 +40,7 @@ $role = $_SESSION['role'];
             <a href="#" onclick="switchToTasks()">Tasks</a>
             <a href="#" onclick="switchToTeam()">Team</a>
         </nav>
-           <a href="logout.php">
-                  <button class="logout-btn" onclick="logout()">Logout</button>
-            </a>
+            <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
     
