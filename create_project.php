@@ -1,10 +1,9 @@
- 
 <?php
 session_start();
 include('connect.php');
 
-// Check if user is logged in AND is supervisor
-if (!isset($_SESSION['userid']) || $_SESSION['role'] != 'supervisor') {
+// Check if user is logged in (any user can create projects)
+if (!isset($_SESSION['userid'])) {
     header("Location: login.html");
     exit();
 }
@@ -18,18 +17,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $due_date = $_POST['due_date'];
     $priority = $_POST['priority'];
-    $supervisor_id = $_SESSION['userid'];
+    $user_id = $_SESSION['userid'];
     
     if (empty($title)) {
         $error = "Project name is required!";
     } else {
-        // Insert into projects table with all fields
-        $sql = "INSERT INTO projects (title, description, supervisor_id, due_date, priority) 
-                VALUES ('$title', '$description', '$supervisor_id', '$due_date', '$priority')";
+        // Generate unique join code
+        $join_code = generateJoinCode($conn);
+        
+        // Insert into projects table
+        $sql = "INSERT INTO projects (title, description, supervisor_id, due_date, priority, join_code) 
+                VALUES ('$title', '$description', '$user_id', '$due_date', '$priority', '$join_code')";
         
         if (mysqli_query($conn, $sql)) {
-            $success = "Project created successfully!";
-            // Clear form after success
+            $project_id = mysqli_insert_id($conn);
+            
+            // Add creator as project member
+            $member_sql = "INSERT INTO project_members (project_id, user_id, team_role) VALUES ('$project_id', '$user_id', 'general')";
+            mysqli_query($conn, $member_sql);
+            
+            $success = "Project created successfully!<br>Share this join code: <strong>$join_code</strong>";
             $_POST = array();
         } else {
             $error = "Error: " . mysqli_error($conn);
@@ -47,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-     /*Nav Bar*/
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -181,7 +187,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             text-decoration: underline;
         }
 
-        /* Footer */
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #c3e6cb;
+            text-align: center;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+            text-align: center;
+        }
+
         .footer {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -242,13 +267,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: rgba(255,255,255,0.6);
         }
     </style>
+</head>
+<body>
     <!-- Header -->
     <header class="header">
         <div class="logo">
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
     </header>
-
 
      <!-- Main Content -->
     <div class="main-content">
@@ -298,7 +324,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <a href="dashboard.php" class="back-link">← Back to Dashboard</a>
         </div>
     </div>
-
 
  <!-- Footer -->
     <footer class="footer">

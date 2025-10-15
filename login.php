@@ -19,16 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         if (password_verify($password, $row['password'])) {
             $_SESSION['username'] = $row['username'];
             $_SESSION['userid'] = $row['id'];
-            $_SESSION['role'] = $row['role'];
 
-            // If role is not set, redirect to choose_role
-            if (empty($row['role'])) {
-                header("Location: choose_role.php");
-                exit();
-            } else {
-                header("Location: dashboard.php");
-                exit();
-            }
+            // Go directly to dashboard (no role check)
+            header("Location: dashboard.php");
+            exit();
         } else {
             $error = "Incorrect password. Please try again.";
         }

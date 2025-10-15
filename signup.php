@@ -25,16 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         Try <a href='login.html'>Login </a>");
     }
 
-    // Insert user into database with NULL role
-    $insert_user = "INSERT INTO users (username, email, password, role) VALUES ('$fullname', '$email', '$hashed_password', NULL)";
+    // Insert user into database (no role field)
+    $insert_user = "INSERT INTO users (username, email, password) VALUES ('$fullname', '$email', '$hashed_password')";
 
     if (mysqli_query($conn, $insert_user)) {
-        // ✅ FIXED: Set session and go to choose_role.php
+        // Set session and go directly to dashboard
         $_SESSION['userid'] = mysqli_insert_id($conn);
         $_SESSION['username'] = $fullname;
-        $_SESSION['role'] = NULL;
         
-        header("Location: choose_role.php");
+        header("Location: dashboard.php");
         exit();
     } else {
         die("Error: " . mysqli_error($conn));
