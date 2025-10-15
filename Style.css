@@ -320,6 +320,53 @@
         }
 
 
+         /* Roles Section */
+        .roles {
+            padding: 50px 200px 60px 200px;
+            background: white;
+        }
+
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .role-card {
+            padding: 3rem 3rem;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .role-card.supervisor {
+            background: #e2e8f0;
+            color: black;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            justify-content: center;
+        }
+
+        .role-card.participant {
+            background: #e2e8f0;
+            color: black;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            justify-content: center;
+        }
+
+        .role-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-align: center;
+            justify-content: center;
+        }
+
         /* Task Board Example */
         .taskboard-header{
             text-align: center;

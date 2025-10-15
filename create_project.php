@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $project_id = mysqli_insert_id($conn);
             
             // Add creator as project member
-            $member_sql = "INSERT INTO project_members (project_id, user_id, team_role) VALUES ('$project_id', '$user_id', 'general')";
+            $member_sql = "INSERT INTO project_members (project_id, user_id, role) VALUES ('$project_id', '$user_id', 'general')";
             mysqli_query($conn, $member_sql);
             
             $success = "Project created successfully!<br>Share this join code: <strong>$join_code</strong>";
