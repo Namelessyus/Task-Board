@@ -3,12 +3,50 @@ session_start();
 include('connect.php');
 
 if (!isset($_SESSION['userid'])) {
-    header("Location: login.html");
+    header("Location: login.php");
     exit();
 }
 
 $username = $_SESSION['username'];
 $userid = $_SESSION['userid'];
+
+// Handle task status update
+if (isset($_GET['update_task'])) {
+    $task_id = mysqli_real_escape_string($conn, $_GET['task_id']);
+    $new_status = mysqli_real_escape_string($conn, $_GET['new_status']);
+    
+    // Verify user has access to this task
+    $check_sql = "SELECT t.* FROM tasks t 
+                  JOIN project_members pm ON t.project_id = pm.project_id 
+                  WHERE t.id = '$task_id' AND pm.user_id = '$userid'";
+    $check_result = mysqli_query($conn, $check_sql);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $update_sql = "UPDATE tasks SET status = '$new_status', updated_at = NOW() WHERE id = '$task_id'";
+        mysqli_query($conn, $update_sql);
+    }
+    header("Location: dashboard.php");
+    exit();
+}
+
+// Handle new task creation
+if (isset($_POST['create_task'])) {
+    $project_id = mysqli_real_escape_string($conn, $_POST['project_id']);
+    $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $title = mysqli_real_escape_string($conn, $_POST['title']);
+    
+    // Verify user has access to this project
+    $check_sql = "SELECT * FROM project_members WHERE project_id = '$project_id' AND user_id = '$userid'";
+    $check_result = mysqli_query($conn, $check_sql);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $insert_sql = "INSERT INTO tasks (project_id, title, status, created_by, created_at, updated_at) 
+                      VALUES ('$project_id', '$title', '$status', '$userid', NOW(), NOW())";
+        mysqli_query($conn, $insert_sql);
+    }
+    header("Location: dashboard.php");
+    exit();
+}
 
 // Get user's projects (created and joined)
 $my_projects = [];
@@ -80,13 +118,6 @@ foreach ($all_projects as $project) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <title>Task Board - Dashboard</title>
-    <style>
-        .dashboard-container {
-            display: flex;
-            min-height: calc(100vh - 140px);
-        }
-        </style>
-
 </head>
 <body>
     <!-- Header -->
@@ -95,10 +126,9 @@ foreach ($all_projects as $project) {
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-            <a href="#" class="active">Home</a>
-            <a href="#" onclick="switchToProjects()">Projects</a>
-            <a href="#" onclick="switchToTasks()">Tasks</a>
-            <a href="#" onclick="switchToTeam()">Team</a>
+            <a href="dashboard.php" class="active">Home</a>
+            <a href="create_project.php">Create Project</a>
+            <a href="join_project.php">Join Project</a>
         </nav>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
@@ -108,75 +138,69 @@ foreach ($all_projects as $project) {
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-section">
-                <h3>Projects I Created</h3>
-                <ul class="project-list" id="created-projects">
+                <label class="dropdown-header" for="created-toggle">
+                    <h3>Projects I Created</h3>
+                    <span class="dropdown-arrow">▼</span>
+                </label>
+                <input type="checkbox" id="created-toggle" class="dropdown-toggle" hidden>
+                <ul class="project-list dropdown-content" id="created-projects">
                     <?php foreach($my_projects as $project): ?>
-                        <li onclick="filterProjects('created', <?php echo $project['id']; ?>)">
-                            <?php echo htmlspecialchars($project['title']); ?>
+                        <li>
+                            <a href="project_detail.php?id=<?php echo $project['id']; ?>">
+                                <?php echo htmlspecialchars($project['title']); ?>
+                            </a>
                         </li>
                     <?php endforeach; ?>
                     <?php if(empty($my_projects)): ?>
-                        <li style="color: #718096; font-style: italic;">No projects created</li>
+                        <li class="no-projects">No projects created</li>
                     <?php endif; ?>
                 </ul>
             </div>
             
             <div class="sidebar-section">
-                <h3>Projects I Joined</h3>
-                <ul class="project-list" id="joined-projects">
+                <label class="dropdown-header" for="joined-toggle">
+                    <h3>Projects I Joined</h3>
+                    <span class="dropdown-arrow">▼</span>
+                </label>
+                <input type="checkbox" id="joined-toggle" class="dropdown-toggle" hidden>
+                <ul class="project-list dropdown-content" id="joined-projects">
                     <?php foreach($joined_projects as $project): ?>
-                        <li onclick="filterProjects('joined', <?php echo $project['id']; ?>)">
-                            <?php echo htmlspecialchars($project['title']); ?>
+                        <li>
+                            <a href="project_detail.php?id=<?php echo $project['id']; ?>">
+                                <?php echo htmlspecialchars($project['title']); ?>
+                            </a>
                         </li>
                     <?php endforeach; ?>
                     <?php if(empty($joined_projects)): ?>
-                        <li style="color: #718096; font-style: italic;">No projects joined</li>
+                        <li class="no-projects">No projects joined</li>
                     <?php endif; ?>
                 </ul>
-            </div>
-            
-            <div class="filters">
-                <h3>Filters</h3>
-                <div class="filter-option">
-                    <input type="checkbox" id="assigned-to-me" onchange="applyFilters()">
-                    <label for="assigned-to-me">Assigned to me</label>
-                </div>
-                <div class="filter-option">
-                    <input type="checkbox" id="high-priority" onchange="applyFilters()">
-                    <label for="high-priority">High Priority</label>
-                </div>
-                <div class="filter-option">
-                    <input type="checkbox" id="due-soon" onchange="applyFilters()">
-                    <label for="due-soon">Due Soon</label>
-                </div>
             </div>
         </div>
 
         <!-- Main Content -->
         <div class="main-content">
             <div class="content-header">
-                <div class="search-bar">
-                    <span class="search-icon">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <input type="text" id="search-input" placeholder="Search tasks, projects, or team members..." onkeyup="searchContent(this.value)">
+                <div class="header-left">
+                    <h1>Welcome, <?php echo htmlspecialchars($username); ?>!</h1>
+                    <p class="welcome-subtitle">Here are all your projects</p>
                 </div>
-                <div class="action-buttons">
-                    <a href="create_project.php" class="btn btn-primary">Create Project</a>
-                    <button class="btn btn-warning" onclick="addTask()">Add Task</button>
+                <div class="header-right">
+                    <div class="action-buttons">
+                        <a href="create_project.php" class="btn btn-primary">Create Project</a>
+                        <a href="join_project.php" class="btn btn-warning">Join Project</a>
+                    </div>
                 </div>
             </div>
-
-            <h1>Welcome, <?php echo htmlspecialchars($username); ?>!</h1>
-            <p style="color: #666; margin-bottom: 30px;">Here are all your projects</p>
 
             <!-- Projects Grid -->
             <div class="projects-grid" id="projects-container">
                 <?php foreach($all_projects as $project): 
                     $tasks = $project_tasks[$project['id']];
                     $total_tasks = count($tasks['pending']) + count($tasks['in_progress']) + count($tasks['completed']);
+                    $completed_percentage = $total_tasks > 0 ? round((count($tasks['completed']) / $total_tasks) * 100) : 0;
                 ?>
-                    <div class="project-card" data-project-id="<?php echo $project['id']; ?>">
+                    <div class="project-card">
                         <div class="project-header">
                             <div>
                                 <h2 class="project-title"><?php echo htmlspecialchars($project['title']); ?></h2>
@@ -186,6 +210,7 @@ foreach ($all_projects as $project) {
                                     </span>
                                     • Due: <?php echo $project['due_date'] ? date('M d, Y', strtotime($project['due_date'])) : 'No due date'; ?>
                                     • <?php echo $total_tasks; ?> tasks
+                                    • <?php echo $completed_percentage; ?>% complete
                                 </div>
                             </div>
                             <a href="project_detail.php?id=<?php echo $project['id']; ?>" class="view-project-btn">
@@ -195,6 +220,11 @@ foreach ($all_projects as $project) {
                         
                         <p style="color: #718096; margin-bottom: 20px;"><?php echo htmlspecialchars($project['description']); ?></p>
                         
+                        <!-- Progress Bar -->
+                        <div style="background: #e2e8f0; border-radius: 10px; height: 8px; margin-bottom: 20px;">
+                            <div style="background: #48bb78; width: <?php echo $completed_percentage; ?>%; height: 100%; border-radius: 10px;"></div>
+                        </div>
+                        
                         <!-- Task Board -->
                         <div class="task-board">
                             <!-- Pending Tasks -->
@@ -203,23 +233,46 @@ foreach ($all_projects as $project) {
                                     <div class="column-title">Pending</div>
                                     <span class="task-count"><?php echo count($tasks['pending']); ?></span>
                                 </div>
-                                <?php foreach($tasks['pending'] as $task): ?>
-                                    <div class="task-card" draggable="true" ondragstart="dragStart(event)" data-task-id="<?php echo $task['id']; ?>">
-                                        <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
-                                        <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
-                                        <div class="task-meta">
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>">
-                                                <?php echo ucfirst($task['priority']); ?>
-                                            </span>
+                                <div class="column-content">
+                                    <?php foreach($tasks['pending'] as $task): ?>
+                                        <div class="task-card">
+                                            <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
+                                            <?php if($task['description']): ?>
+                                                <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
+                                            <?php endif; ?>
+                                            <div class="task-meta">
+                                                <span class="task-priority priority-<?php echo $task['priority']; ?>">
+                                                    <?php echo ucfirst($task['priority']); ?>
+                                                </span>
+                                                <div style="display: flex; gap: 5px;">
+                                                    <a href="dashboard.php?update_task=1&task_id=<?php echo $task['id']; ?>&new_status=in_progress" 
+                                                       class="btn" style="padding: 4px 8px; font-size: 11px; background: #4299e1; color: white; text-decoration: none;">Start</a>
+                                                    <a href="dashboard.php?update_task=1&task_id=<?php echo $task['id']; ?>&new_status=completed" 
+                                                       class="btn" style="padding: 4px 8px; font-size: 11px; background: #48bb78; color: white; text-decoration: none;">Complete</a>
+                                                </div>
+                                            </div>
                                             <?php if($task['assignee_name']): ?>
-                                                <span><?php echo $task['assignee_name']; ?></span>
+                                                <div style="font-size: 12px; color: #718096; margin-top: 8px;">
+                                                    Assigned to: <?php echo $task['assignee_name']; ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                                <button class="add-task-btn" onclick="addNewTask(<?php echo $project['id']; ?>, 'pending')">
-                                    <i class="fa fa-plus"></i> Add Task
-                                </button>
+                                    <?php endforeach; ?>
+                                    
+                                    <!-- Add Task Form -->
+                                    <form method="POST" action="dashboard.php" style="margin-top: 10px;">
+                                        <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
+                                        <input type="hidden" name="status" value="pending">
+                                        <div style="display: flex; gap: 5px;">
+                                            <input type="text" name="title" placeholder="New task..." required 
+                                                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                                            <button type="submit" name="create_task" class="btn" 
+                                                    style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Add
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                             
                             <!-- In Progress Tasks -->
@@ -228,23 +281,46 @@ foreach ($all_projects as $project) {
                                     <div class="column-title">In Progress</div>
                                     <span class="task-count"><?php echo count($tasks['in_progress']); ?></span>
                                 </div>
-                                <?php foreach($tasks['in_progress'] as $task): ?>
-                                    <div class="task-card" draggable="true" ondragstart="dragStart(event)" data-task-id="<?php echo $task['id']; ?>">
-                                        <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
-                                        <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
-                                        <div class="task-meta">
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>">
-                                                <?php echo ucfirst($task['priority']); ?>
-                                            </span>
+                                <div class="column-content">
+                                    <?php foreach($tasks['in_progress'] as $task): ?>
+                                        <div class="task-card">
+                                            <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
+                                            <?php if($task['description']): ?>
+                                                <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
+                                            <?php endif; ?>
+                                            <div class="task-meta">
+                                                <span class="task-priority priority-<?php echo $task['priority']; ?>">
+                                                    <?php echo ucfirst($task['priority']); ?>
+                                                </span>
+                                                <div style="display: flex; gap: 5px;">
+                                                    <a href="dashboard.php?update_task=1&task_id=<?php echo $task['id']; ?>&new_status=pending" 
+                                                       class="btn" style="padding: 4px 8px; font-size: 11px; background: #ed8936; color: white; text-decoration: none;">Back</a>
+                                                    <a href="dashboard.php?update_task=1&task_id=<?php echo $task['id']; ?>&new_status=completed" 
+                                                       class="btn" style="padding: 4px 8px; font-size: 11px; background: #48bb78; color: white; text-decoration: none;">Complete</a>
+                                                </div>
+                                            </div>
                                             <?php if($task['assignee_name']): ?>
-                                                <span><?php echo $task['assignee_name']; ?></span>
+                                                <div style="font-size: 12px; color: #718096; margin-top: 8px;">
+                                                    Assigned to: <?php echo $task['assignee_name']; ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                                <button class="add-task-btn" onclick="addNewTask(<?php echo $project['id']; ?>, 'in_progress')">
-                                    <i class="fa fa-plus"></i> Add Task
-                                </button>
+                                    <?php endforeach; ?>
+                                    
+                                    <!-- Add Task Form -->
+                                    <form method="POST" action="dashboard.php" style="margin-top: 10px;">
+                                        <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
+                                        <input type="hidden" name="status" value="in_progress">
+                                        <div style="display: flex; gap: 5px;">
+                                            <input type="text" name="title" placeholder="New task..." required 
+                                                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                                            <button type="submit" name="create_task" class="btn" 
+                                                    style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Add
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                             
                             <!-- Completed Tasks -->
@@ -253,23 +329,42 @@ foreach ($all_projects as $project) {
                                     <div class="column-title">Completed</div>
                                     <span class="task-count"><?php echo count($tasks['completed']); ?></span>
                                 </div>
-                                <?php foreach($tasks['completed'] as $task): ?>
-                                    <div class="task-card" draggable="true" ondragstart="dragStart(event)" data-task-id="<?php echo $task['id']; ?>">
-                                        <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
-                                        <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
-                                        <div class="task-meta">
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>">
-                                                <?php echo ucfirst($task['priority']); ?>
-                                            </span>
+                                <div class="column-content">
+                                    <?php foreach($tasks['completed'] as $task): ?>
+                                        <div class="task-card">
+                                            <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
+                                            <?php if($task['description']): ?>
+                                                <div class="task-description"><?php echo htmlspecialchars(substr($task['description'], 0, 100)); ?></div>
+                                            <?php endif; ?>
+                                            <div class="task-meta">
+                                                <span class="task-priority priority-<?php echo $task['priority']; ?>">
+                                                    <?php echo ucfirst($task['priority']); ?>
+                                                </span>
+                                                <a href="dashboard.php?update_task=1&task_id=<?php echo $task['id']; ?>&new_status=in_progress" 
+                                                   class="btn" style="padding: 4px 8px; font-size: 11px; background: #ed8936; color: white; text-decoration: none;">Reopen</a>
+                                            </div>
                                             <?php if($task['assignee_name']): ?>
-                                                <span><?php echo $task['assignee_name']; ?></span>
+                                                <div style="font-size: 12px; color: #718096; margin-top: 8px;">
+                                                    Assigned to: <?php echo $task['assignee_name']; ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                                <button class="add-task-btn" onclick="addNewTask(<?php echo $project['id']; ?>, 'completed')">
-                                    <i class="fa fa-plus"></i> Add Task
-                                </button>
+                                    <?php endforeach; ?>
+                                    
+                                    <!-- Add Task Form -->
+                                    <form method="POST" action="dashboard.php" style="margin-top: 10px;">
+                                        <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
+                                        <input type="hidden" name="status" value="completed">
+                                        <div style="display: flex; gap: 5px;">
+                                            <input type="text" name="title" placeholder="New task..." required 
+                                                   style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                                            <button type="submit" name="create_task" class="btn" 
+                                                    style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Add
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -291,17 +386,16 @@ foreach ($all_projects as $project) {
         <div class="footer-content">
             <div class="footer-section">
                 <div class="logo">
-                    <a href="Index.html"><i class="fas fa-tasks"></i> Task Board</a>
+                    <a href="index.html"><i class="fas fa-tasks"></i> Task Board</a>
                 </div>
                 <p>A modern solution for project management and task tracking designed for academic teams and beyond.</p>
             </div>
             <div class="footer-section">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
-                    <li><a href="#" onclick="switchToHome()">Home</a></li>
-                    <li><a href="#" onclick="switchToProjects()">Projects</a></li>
-                    <li><a href="#" onclick="switchToTasks()">Tasks</a></li>
-                    <li><a href="#" onclick="switchToTeam()">Team</a></li>
+                    <li><a href="dashboard.php">Home</a></li>
+                    <li><a href="create_project.php">Create Project</a></li>
+                    <li><a href="join_project.php">Join Project</a></li>
                 </ul>
             </div>
             <div class="footer-section">
@@ -320,95 +414,5 @@ foreach ($all_projects as $project) {
             <p>&copy; 2025 Task Board. All rights reserved.</p>
         </div>
     </footer>
-
-    <script>
-        // Simple filtering functionality
-        function filterProjects(type, projectId) {
-            // Remove active class from all items
-            document.querySelectorAll('.project-list li').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            // Add active class to clicked item
-            event.target.classList.add('active');
-            
-            // For now, just scroll to the project in main content
-            const projectElement = document.querySelector(`[data-project-id="${projectId}"]`);
-            if (projectElement) {
-                projectElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                projectElement.style.background = '#f0fff4';
-                setTimeout(() => {
-                    projectElement.style.background = 'white';
-                }, 2000);
-            }
-        }
-        
-        function searchContent(query) {
-            const projects = document.querySelectorAll('.project-card');
-            projects.forEach(project => {
-                const text = project.textContent.toLowerCase();
-                if (text.includes(query.toLowerCase())) {
-                    project.style.display = 'block';
-                } else {
-                    project.style.display = 'none';
-                }
-            });
-        }
-        
-        function applyFilters() {
-            // Basic filter implementation - can be enhanced
-            console.log('Filters applied');
-        }
-        
-        // Drag and drop functionality
-        function dragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
-        }
-        
-        // Make task columns drop targets
-        document.addEventListener('DOMContentLoaded', function() {
-            const columns = document.querySelectorAll('.task-column');
-            columns.forEach(column => {
-                column.addEventListener('dragover', e => e.preventDefault());
-                column.addEventListener('drop', handleDrop);
-            });
-        });
-        
-        function handleDrop(e) {
-            e.preventDefault();
-            const taskId = e.dataTransfer.getData('text/plain');
-            const newStatus = e.target.closest('.task-column').querySelector('.column-title').textContent.toLowerCase().replace(' ', '_');
-            
-            // Update task status in database
-            updateTaskStatus(taskId, newStatus);
-        }
-        
-        function updateTaskStatus(taskId, newStatus) {
-            // AJAX call to update task status
-            fetch('update_task_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `task_id=${taskId}&status=${newStatus}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload(); // Simple refresh for now
-                }
-            });
-        }
-        
-        function addNewTask(projectId, status) {
-            // Redirect to task creation page or show modal
-            window.location.href = `create_task.php?project_id=${projectId}&status=${status}`;
-        }
-        
-        // Placeholder functions for navigation
-        function switchToHome() { window.location.href = 'dashboard.php'; }
-        function switchToProjects() { }
-        function switchToTasks() { }
-        function switchToTeam() { }
-        function addTask() {  }
-    </script>
 </body>
 </html>
