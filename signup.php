@@ -8,6 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
+    // Check if username contains numbers
+    if (preg_match('/[0-9]/', $fullname)) {
+        die("Username should not contain numbers. <a href='signup.html'>Go back</a>");
+    }
+
     // Check if passwords match
     if ($password !== $confirm_password) {
         die("Passwords do not match. <a href='signup.html'>Go back</a>");
