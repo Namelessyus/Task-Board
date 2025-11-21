@@ -100,6 +100,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     }
 }
 
+// Handle project deletion (only for supervisors)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $is_supervisor) {
+    // Double check if user is the supervisor
+    if ($project['supervisor_id'] == $user_id) {
+        // Delete project and all related data (cascade delete should handle this)
+        $delete_sql = "DELETE FROM projects WHERE id = '$project_id' AND supervisor_id = '$user_id'";
+        
+        if (mysqli_query($conn, $delete_sql)) {
+            // Redirect to dashboard after successful deletion
+            $_SESSION['success'] = "Project deleted successfully!";
+            header("Location: dashboard.php");
+            exit();
+        } else {
+            $error = "Error deleting project: " . mysqli_error($conn);
+        }
+    } else {
+        $error = "You don't have permission to delete this project.";
+    }
+}
+
 // Get project members
 $members_sql = "SELECT u.id, u.username, pm.role 
                 FROM project_members pm 
@@ -685,7 +705,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                         </div>
 
                         <!-- Delete Project Card -->
-                        <div class="manage-card">
+                        <div class="manage-card" onclick="showDeleteConfirmation()">
                             <div class="manage-icon">
                                 <i class="fas fa-trash-alt"></i>
                             </div>
@@ -737,6 +757,30 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center;">
+            <div style="font-size: 3rem; color: #e53e3e; margin-bottom: 15px;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 style="color: #2d3748; margin-bottom: 10px;">Delete Project?</h3>
+            <p style="color: #718096; margin-bottom: 20px;">
+                Are you sure you want to delete the project "<strong><?php echo htmlspecialchars($project['title']); ?></strong>"? 
+                This action cannot be undone and all tasks and data will be permanently lost.
+            </p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button onclick="hideDeleteConfirmation()" style="padding: 10px 20px; border: 1px solid #cbd5e0; background: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Cancel
+                </button>
+                <form method="POST" action="" style="display: inline;">
+                    <button type="submit" name="delete_project" style="padding: 10px 20px; background: #e53e3e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                        Yes, Delete Project
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Smooth scrolling for navigation
         document.querySelectorAll('.project-list a').forEach(anchor => {
@@ -748,6 +792,22 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                     targetElement.scrollIntoView({ behavior: 'smooth' });
                 }
             });
+        });
+
+        // Delete confirmation functions
+        function showDeleteConfirmation() {
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function hideDeleteConfirmation() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideDeleteConfirmation();
+            }
         });
     </script>
 </body>
