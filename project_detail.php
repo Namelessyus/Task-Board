@@ -59,16 +59,33 @@ if ($manage_mode && !$is_supervisor) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_supervisor) {
     $task_title = mysqli_real_escape_string($conn, $_POST['task_title']);
     $task_description = mysqli_real_escape_string($conn, $_POST['task_description']);
-    $assigned_to = isset($_POST['assigned_to']) ? intval($_POST['assigned_to']) : null;
     $task_priority = $_POST['task_priority'];
+    
+    // Handle assigned_to properly
+    $assigned_to = $_POST['assigned_to'];
+    if (empty($assigned_to)) {
+        $assigned_to = "NULL";
+    } else {
+        $assigned_to = "'" . intval($assigned_to) . "'";
+    }
+    
+    // Handle due_date properly
     $task_due_date = $_POST['task_due_date'];
+    if (empty($task_due_date)) {
+        $task_due_date = "NULL";
+    } else {
+        $task_due_date = "'$task_due_date'";
+    }
     
     if (!empty($task_title)) {
         $task_sql = "INSERT INTO tasks (project_id, title, description, assigned_to, priority, due_date, created_by) 
-                     VALUES ('$project_id', '$task_title', '$task_description', '$assigned_to', '$task_priority', '$task_due_date', '$user_id')";
+                     VALUES ('$project_id', '$task_title', '$task_description', $assigned_to, '$task_priority', $task_due_date, '$user_id')";
         
         if (mysqli_query($conn, $task_sql)) {
             $success = "Task created successfully!";
+            // Refresh to show the new task
+            header("Location: project_detail.php?id=$project_id&manage=true");
+            exit();
         } else {
             $error = "Error creating task: " . mysqli_error($conn);
         }
@@ -76,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
         $error = "Task title is required!";
     }
 }
-
 // Handle task status update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $task_id = intval($_POST['task_id']);
