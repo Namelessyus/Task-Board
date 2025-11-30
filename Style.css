@@ -452,11 +452,6 @@
             transition: all 0.3s;
         }
 
-        .task-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transform: translateY(-2px);
-        }
-
         .task-title {
             font-weight: 600;
             margin-bottom: 8px;
@@ -538,12 +533,6 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-
-        .add-task-btn:hover {
-            border-color: #17a2b8;
-            color: #17a2b8;
-        }
-
 
         /* End Question Section */
         .cta {
