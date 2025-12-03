@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 include('connect.php');
@@ -11,15 +10,15 @@ if (!isset($_SESSION['userid'])) {
 $username = $_SESSION['username'];
 $userid = $_SESSION['userid'];
 
-// Get user's projects (created and joined)
+// Get user's projects (created and joined) - excluding soft-deleted
 $my_projects = [];
 $joined_projects = [];
 
-// Projects created by user (where user is supervisor)
+// Projects created by user (where user is supervisor) - excluding soft-deleted
 $created_sql = "SELECT p.*, COUNT(pm.user_id) as member_count 
                 FROM projects p 
                 LEFT JOIN project_members pm ON p.id = pm.project_id 
-                WHERE p.supervisor_id = '$userid' 
+                WHERE p.supervisor_id = '$userid' AND p.is_deleted = 0
                 GROUP BY p.id 
                 ORDER BY p.created_at DESC";
 $created_result = mysqli_query($conn, $created_sql);
@@ -29,11 +28,11 @@ if ($created_result) {
     }
 }
 
-// Projects joined by user (where user is participant)
+// Projects joined by user (where user is participant) - excluding soft-deleted
 $joined_sql = "SELECT p.*, pm.role as member_role 
                FROM projects p 
                JOIN project_members pm ON p.id = pm.project_id 
-               WHERE pm.user_id = '$userid' AND p.supervisor_id != '$userid'
+               WHERE pm.user_id = '$userid' AND p.supervisor_id != '$userid' AND p.is_deleted = 0
                ORDER BY p.created_at DESC";
 $joined_result = mysqli_query($conn, $joined_sql);
 if ($joined_result) {
@@ -44,6 +43,12 @@ if ($joined_result) {
 
 // Combine all projects for the main grid
 $all_projects = array_merge($my_projects, $joined_projects);
+
+// Check for success message from project deletion
+if (isset($_SESSION['success'])) {
+    $success_message = $_SESSION['success'];
+    unset($_SESSION['success']);
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -261,6 +266,16 @@ $all_projects = array_merge($my_projects, $joined_projects);
             color: white;
             transform: translateY(-2px);
         }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #c3e6cb;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -326,14 +341,19 @@ $all_projects = array_merge($my_projects, $joined_projects);
         <!-- Main Content -->
         <div class="main-content">
             <!-- Welcome Section -->
+            <?php if(isset($success_message)): ?>
+                <div class="success-message">
+                    <?php echo $success_message; ?>
+                </div>
+            <?php endif; ?>
  
             <?php if(!empty($all_projects)): ?>
                 <div class="classroom-grid">
                     <?php foreach($all_projects as $project): 
                         $is_supervisor = ($project['supervisor_id'] == $userid);
                         
-                        // Get task counts for this project
-                        $tasks_sql = "SELECT status, COUNT(*) as count FROM tasks WHERE project_id = '{$project['id']}' GROUP BY status";
+                        // Get task counts for this project (excluding soft-deleted)
+                        $tasks_sql = "SELECT status, COUNT(*) as count FROM tasks WHERE project_id = '{$project['id']}' AND is_deleted = 0 GROUP BY status";
                         $tasks_result = mysqli_query($conn, $tasks_sql);
                         $task_counts = ['pending' => 0, 'in_progress' => 0, 'completed' => 0];
                         

@@ -324,7 +324,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <a href="dashboard.php" class="back-link">← Back to Dashboard</a>
         </div>
     </div>
-
+<!-- Sidebar -->
+<div class="sidebar">
+    <div class="sidebar-section">
+        <h3>Project Navigation</h3>
+        <ul class="project-list">
+            <li><a href="#overview">Overview</a></li>
+            <?php if (!$manage_mode): ?>
+                <li><a href="#members">Team Members</a></li>
+                <li><a href="#tasks">Tasks</a></li>
+                <li><a href="#progress-charts">Progress Charts</a></li>
+            <?php else: ?>
+                <li><a href="#manage">Manage Project</a></li>
+            <?php endif; ?>
+        </ul>
+    </div>
+    
+    <!-- Progress Stats -->
+    <div class="sidebar-stats">
+        <h3>Quick Stats</h3>
+        <div class="stat-item">
+            <span class="stat-label">Total Tasks</span>
+            <span class="stat-value"><?php echo $total_tasks; ?></span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Completed</span>
+            <span class="stat-value"><?php echo $completed_count; ?></span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">In Progress</span>
+            <span class="stat-value"><?php echo count($in_progress_tasks); ?></span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Pending</span>
+            <span class="stat-value"><?php echo count($pending_tasks); ?></span>
+        </div>
+    </div>
+    
+    <div class="quick-actions">
+        <?php if ($is_supervisor): ?>
+            <?php if ($manage_mode): ?>
+                <a href="project_detail.php?id=<?php echo $project_id; ?>" class="quick-btn btn-primary">
+                    <i class="fas fa-eye"></i> View Project
+                </a>
+            <?php else: ?>
+                <a href="project_detail.php?id=<?php echo $project_id; ?>&manage=true" class="quick-btn btn-warning">
+                    <i class="fas fa-cog"></i> Manage Project
+                </a>
+            <?php endif; ?>
+        <?php endif; ?>
+        <a href="dashboard.php" class="quick-btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
  <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -361,5 +414,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <p>&copy; 2025 Task Board. All rights reserved.</p>
         </div>
     </footer>
+    // In create_project.php form section, add this script
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dueDateInput = document.getElementById('due_date');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (dueDateInput) {
+        dueDateInput.min = today;
+    }
+    
+    // For task due date
+    const taskDueDate = document.querySelector('input[name="task_due_date"]');
+    if (taskDueDate) {
+        taskDueDate.min = today;
+    }
+});
+</script>
 </body>
 </html>

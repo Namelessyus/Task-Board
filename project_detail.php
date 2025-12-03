@@ -19,11 +19,11 @@ if ($project_id == 0) {
     exit();
 }
 
-// Get project details
+// Get project details (excluding soft-deleted)
 $project_sql = "SELECT p.*, u.username as supervisor_name 
                 FROM projects p 
                 JOIN users u ON p.supervisor_id = u.id 
-                WHERE p.id = '$project_id'";
+                WHERE p.id = '$project_id' AND p.is_deleted = 0";
 $project_result = mysqli_query($conn, $project_sql);
 
 if (!$project_result || mysqli_num_rows($project_result) == 0) {
@@ -93,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
         $error = "Task title is required!";
     }
 }
+
 // Handle task status update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $task_id = intval($_POST['task_id']);
@@ -101,11 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     // Verify user has access to this task
     $verify_sql = "SELECT t.* FROM tasks t 
                    JOIN project_members pm ON t.project_id = pm.project_id 
-                   WHERE t.id = '$task_id' AND pm.user_id = '$user_id' AND t.project_id = '$project_id'";
+                   WHERE t.id = '$task_id' AND pm.user_id = '$user_id' AND t.project_id = '$project_id' AND t.is_deleted = 0";
     $verify_result = mysqli_query($conn, $verify_sql);
     
     if (mysqli_num_rows($verify_result) > 0) {
-        $update_sql = "UPDATE tasks SET status = '$new_status' WHERE id = '$task_id'";
+        $update_sql = "UPDATE tasks SET status = '$new_status' WHERE id = '$task_id' AND is_deleted = 0";
         if (mysqli_query($conn, $update_sql)) {
             $success = "Task status updated!";
         } else {
@@ -116,14 +117,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     }
 }
 
-// Handle project deletion (only for supervisors)
+// Handle task deletion (only for supervisors)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_task']) && $is_supervisor) {
+    $task_id = intval($_POST['task_id']);
+    
+    // Double check if user is the supervisor
+    if ($project['supervisor_id'] == $user_id) {
+        // Soft delete the task
+        $delete_sql = "UPDATE tasks SET is_deleted = 1, deleted_at = NOW() WHERE id = '$task_id' AND project_id = '$project_id'";
+        
+        if (mysqli_query($conn, $delete_sql)) {
+            $success = "Task deleted successfully!";
+            // Refresh to remove the task from view
+            header("Location: project_detail.php?id=$project_id&manage=true");
+            exit();
+        } else {
+            $error = "Error deleting task: " . mysqli_error($conn);
+        }
+    } else {
+        $error = "You don't have permission to delete this task.";
+    }
+}
+
+// Handle project deletion (only for supervisors) - SOFT DELETE
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $is_supervisor) {
     // Double check if user is the supervisor
     if ($project['supervisor_id'] == $user_id) {
-        // Delete project and all related data (cascade delete should handle this)
-        $delete_sql = "DELETE FROM projects WHERE id = '$project_id' AND supervisor_id = '$user_id'";
+        // Soft delete the project
+        $delete_sql = "UPDATE projects SET is_deleted = 1, deleted_at = NOW() WHERE id = '$project_id' AND supervisor_id = '$user_id'";
         
         if (mysqli_query($conn, $delete_sql)) {
+            // Also soft delete all tasks in this project
+            $delete_tasks_sql = "UPDATE tasks SET is_deleted = 1, deleted_at = NOW() WHERE project_id = '$project_id'";
+            mysqli_query($conn, $delete_tasks_sql);
+            
             // Redirect to dashboard after successful deletion
             $_SESSION['success'] = "Project deleted successfully!";
             header("Location: dashboard.php");
@@ -148,12 +175,12 @@ while ($row = mysqli_fetch_assoc($members_result)) {
     $project_members[] = $row;
 }
 
-// Get tasks for this project
+// Get tasks for this project (excluding soft-deleted)
 $tasks_sql = "SELECT t.*, u.username as assigned_username, creator.username as creator_name
               FROM tasks t 
               LEFT JOIN users u ON t.assigned_to = u.id 
               JOIN users creator ON t.created_by = creator.id
-              WHERE t.project_id = '$project_id' 
+              WHERE t.project_id = '$project_id' AND t.is_deleted = 0
               ORDER BY 
                 CASE t.priority 
                     WHEN 'high' THEN 1 
@@ -431,6 +458,40 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             margin-bottom: 10px;
         }
         
+        /* Task card with delete option */
+        .task-card {
+            position: relative;
+        }
+        
+        .task-delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .task-card:hover .task-delete-btn {
+            opacity: 1;
+        }
+        
+        .delete-task-form {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        
         /* For mobile responsiveness */
         @media (max-width: 768px) {
             .project-title {
@@ -456,6 +517,10 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             .btn-manage {
                 width: 100%;
                 justify-content: center;
+            }
+            
+            .task-delete-btn {
+                opacity: 1;
             }
         }
         /* FLEXBOX SOLUTION - Clean and working */
@@ -678,6 +743,14 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             <div class="column-content">
                                 <?php foreach ($pending_tasks as $task): ?>
                                     <div class="task-card">
+                                        <?php if ($is_supervisor): ?>
+                                        <form method="POST" action="" class="delete-task-form" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                                            <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                            <button type="submit" name="delete_task" class="task-delete-btn" title="Delete Task">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
                                         <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
                                         <?php if ($task['description']): ?>
                                             <div class="task-description"><?php echo htmlspecialchars($task['description']); ?></div>
@@ -725,6 +798,14 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             <div class="column-content">
                                 <?php foreach ($in_progress_tasks as $task): ?>
                                     <div class="task-card">
+                                        <?php if ($is_supervisor): ?>
+                                        <form method="POST" action="" class="delete-task-form" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                                            <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                            <button type="submit" name="delete_task" class="task-delete-btn" title="Delete Task">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
                                         <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
                                         <?php if ($task['description']): ?>
                                             <div class="task-description"><?php echo htmlspecialchars($task['description']); ?></div>
@@ -779,6 +860,14 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             <div class="column-content">
                                 <?php foreach ($completed_tasks as $task): ?>
                                     <div class="task-card">
+                                        <?php if ($is_supervisor): ?>
+                                        <form method="POST" action="" class="delete-task-form" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                                            <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                            <button type="submit" name="delete_task" class="task-delete-btn" title="Delete Task">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
                                         <div class="task-title"><?php echo htmlspecialchars($task['title']); ?></div>
                                         <?php if ($task['description']): ?>
                                             <div class="task-description"><?php echo htmlspecialchars($task['description']); ?></div>
@@ -876,7 +965,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                     <?php foreach ($project_members as $member): ?>
                                         <option value="<?php echo $member['id']; ?>">
                                             <?php echo htmlspecialchars($member['username']); ?> 
-                                            (<?php echo $member['role']; ?>)>
+                                            (<?php echo $member['role']; ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -897,6 +986,41 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                         </button>
                     </form>
                 </div>
+                
+                <!-- Task List for Management -->
+                <div class="members-list">
+                    <h3><i class="fas fa-tasks"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
+                    <?php foreach ($tasks as $task): ?>
+                        <div class="member-item">
+                            <div class="member-info">
+                                <i class="fas fa-task"></i>
+                                <span>
+                                    <strong><?php echo htmlspecialchars($task['title']); ?></strong> - 
+                                    <span class="task-priority priority-<?php echo $task['priority']; ?>" style="font-size: 11px;">
+                                        <?php echo ucfirst($task['priority']); ?> Priority
+                                    </span> - 
+                                    <span style="color: #718096; font-size: 12px;">
+                                        Status: <?php echo ucfirst(str_replace('_', ' ', $task['status'])); ?>
+                                    </span>
+                                    <?php if ($task['assigned_username']): ?>
+                                        <span style="color: #667eea; font-size: 12px;">
+                                            (Assigned to: <?php echo htmlspecialchars($task['assigned_username']); ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <form method="POST" action="" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                                <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                <button type="submit" name="delete_task" class="btn-manage btn-danger" style="padding: 6px 12px; font-size: 12px;">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($tasks)): ?>
+                        <div class="no-tasks">No tasks yet. Create your first task above.</div>
+                    <?php endif; ?>
+                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -910,7 +1034,8 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             <h3 style="color: #2d3748; margin-bottom: 10px;">Delete Project?</h3>
             <p style="color: #718096; margin-bottom: 20px;">
                 Are you sure you want to delete the project "<strong><?php echo htmlspecialchars($project['title']); ?></strong>"? 
-                This action cannot be undone and all tasks and data will be permanently lost.
+                <br><br>
+                This will <strong>soft delete</strong> the project and all its tasks. They will be hidden from view but can be restored from the database if needed.
             </p>
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button onclick="hideDeleteConfirmation()" style="padding: 10px 20px; border: 1px solid #cbd5e0; background: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500;">
@@ -953,6 +1078,11 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                 hideDeleteConfirmation();
             }
         });
+        
+        // Confirm task deletion
+        function confirmTaskDelete(form) {
+            return confirm('Are you sure you want to delete this task?');
+        }
     </script>
 </body>
 </html>
