@@ -440,20 +440,247 @@ if (isset($_SESSION['success'])) {
 
     
     <script>
-    function toggleDropdown(dropdownId) {
-        const dropdown = document.getElementById(dropdownId);
-        const arrow = document.getElementById(dropdownId.replace('projects', 'arrow'));
-        
-        dropdown.classList.toggle('active');
-        arrow.style.transform = dropdown.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
-    }
+function toggleDropdown(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    const arrow = document.getElementById(dropdownId.replace('projects', 'arrow'));
+    
+    dropdown.classList.toggle('active');
+    arrow.style.transform = dropdown.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+}
 
-    // Initialize dropdowns as open by default
-    document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('created-projects').classList.add('active');
-        document.getElementById('joined-projects').classList.add('active');
+// Initialize dropdowns as open by default
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('created-projects').classList.add('active');
+    document.getElementById('joined-projects').classList.add('active');
+    
+    // Add draggable functionality
+    makeProjectsDraggable();
+});
+
+// Simple draggable functionality
+function makeProjectsDraggable() {
+    const grid = document.querySelector('.classroom-grid');
+    const cards = document.querySelectorAll('.class-card');
+    
+    cards.forEach(card => {
+        // Make card draggable
+        card.draggable = true;
+        card.style.cursor = 'move';
+        card.style.userSelect = 'none';
+        
+        // Drag events
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('dragenter', handleDragEnter);
+        card.addEventListener('dragleave', handleDragLeave);
+        card.addEventListener('drop', handleDrop);
+        card.addEventListener('dragend', handleDragEnd);
     });
-    </script>
+}
+
+let draggedCard = null;
+
+function handleDragStart(e) {
+    draggedCard = this;
+    this.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault(); // Necessary to allow dropping
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    if (this !== draggedCard) {
+        this.classList.add('over');
+    }
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation(); // stops the browser from redirecting
+    }
+    
+    // Don't do anything if dropping the same card we're dragging
+    if (draggedCard !== this) {
+        // Get the grid
+        const grid = document.querySelector('.classroom-grid');
+        
+        // Get all cards
+        const cards = Array.from(document.querySelectorAll('.class-card'));
+        
+        // Get the index of dragged card and target card
+        const draggedIndex = cards.indexOf(draggedCard);
+        const targetIndex = cards.indexOf(this);
+        
+        if (draggedIndex < targetIndex) {
+            // Insert after the target
+            grid.insertBefore(draggedCard, this.nextSibling);
+        } else {
+            // Insert before the target
+            grid.insertBefore(draggedCard, this);
+        }
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    // Reset the opacity
+    this.style.opacity = '1';
+    
+    // Remove over class from all cards
+    document.querySelectorAll('.class-card').forEach(card => {
+        card.classList.remove('over');
+    });
+    
+    // Save the new order
+    saveProjectOrder();
+}
+
+// Save project order to localStorage
+function saveProjectOrder() {
+    const cards = Array.from(document.querySelectorAll('.class-card'));
+    const projectIds = cards.map(card => {
+        // Try to get project ID from data attribute or extract from link
+        const link = card.querySelector('a.btn-primary');
+        if (link) {
+            const url = new URL(link.href, window.location.origin);
+            return url.searchParams.get('id');
+        }
+        return null;
+    }).filter(id => id !== null);
+    
+    if (projectIds.length > 0) {
+        localStorage.setItem('projectOrder', JSON.stringify(projectIds));
+        showNotification('Project order saved!');
+    }
+}
+
+// Show notification
+function showNotification(message) {
+    // Create notification element
+    let notification = document.getElementById('drag-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'drag-notification';
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #38a169;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        `;
+        notification.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
+        document.body.appendChild(notification);
+    }
+    
+    notification.querySelector('span').textContent = message;
+    notification.style.display = 'flex';
+    
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 2000);
+}
+
+// Add CSS for drag and drop
+const style = document.createElement('style');
+style.textContent = `
+    .class-card.over {
+        border: 2px dashed #667eea;
+        background: #f0f4ff;
+    }
+    
+    .class-card.dragging {
+        opacity: 0.5;
+        transform: rotate(3deg);
+    }
+    
+    /* Improve long text handling */
+    .class-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.3;
+        max-height: 2.6em;
+    }
+    
+    .class-description {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.4;
+        max-height: 2.8em;
+    }
+`;
+document.head.appendChild(style);
+
+// Load saved order on page load
+window.addEventListener('load', function() {
+    const savedOrder = localStorage.getItem('projectOrder');
+    if (savedOrder) {
+        try {
+            const order = JSON.parse(savedOrder);
+            const grid = document.querySelector('.classroom-grid');
+            const cards = Array.from(document.querySelectorAll('.class-card'));
+            
+            // Filter cards that have project IDs
+            const projectCards = cards.filter(card => {
+                const link = card.querySelector('a.btn-primary');
+                if (link) {
+                    const url = new URL(link.href, window.location.origin);
+                    return url.searchParams.get('id');
+                }
+                return false;
+            });
+            
+            // Sort based on saved order
+            projectCards.sort((a, b) => {
+                const linkA = a.querySelector('a.btn-primary');
+                const linkB = b.querySelector('a.btn-primary');
+                const idA = new URL(linkA.href, window.location.origin).searchParams.get('id');
+                const idB = new URL(linkB.href, window.location.origin).searchParams.get('id');
+                
+                const indexA = order.indexOf(idA);
+                const indexB = order.indexOf(idB);
+                
+                return indexA - indexB;
+            });
+            
+            // Get the "Create New Project" card
+            const createCard = cards.find(card => !card.querySelector('a.btn-primary'));
+            
+            // Reorder in DOM
+            projectCards.forEach(card => grid.appendChild(card));
+            if (createCard) {
+                grid.appendChild(createCard);
+            }
+        } catch (e) {
+            console.error('Error loading saved order:', e);
+        }
+    }
+});
+</script>
     
 </body>
 </html>
