@@ -162,16 +162,17 @@ body {
 }
 
 .project-list a {
-    display: block;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 8px 12px;
     border-radius: 6px;
     text-decoration: none;
     color: #4a5568;
     transition: all 0.3s;
     border-left: 3px solid transparent;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    min-height: 36px;
+    gap: 8px;
 }
 
 .project-list a:hover {
@@ -181,11 +182,49 @@ body {
     text-decoration: none;
 }
 
+/* FIX FOR LONG PROJECT TITLES - UPDATED WITH CHARACTER LIMIT */
+.project-list a {
+    min-width: 0; /* This is crucial for text truncation in flexbox */
+}
+
+.project-title-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0; /* Important for flexbox truncation */
+    max-width: 180px; /* Limits to about 18 characters */
+    font-size: 14px;
+}
+
 .no-projects {
     color: #718096;
     font-style: italic;
     padding: 8px 12px;
     font-size: 14px;
+}
+
+/* Badge Styles - UPDATED */
+.supervisor-badge {
+    background: #f59e0b;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.participant-badge {
+    background: #667eea;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Quick Actions */
@@ -303,25 +342,6 @@ body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-}
-
-/* Badge Styles */
-.supervisor-badge {
-    background: #f59e0b;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.participant-badge {
-    background: #667eea;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
 }
 
 /* Task Board */
@@ -616,7 +636,6 @@ body {
     text-decoration: none;
     color: white;
 }
-
 
 /* Responsive Design */
 @media (max-width: 768px) {

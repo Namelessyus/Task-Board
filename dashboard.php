@@ -305,7 +305,16 @@ if (isset($_SESSION['success'])) {
                     <?php foreach($my_projects as $project): ?>
                         <li>
                             <a href="project_detail.php?id=<?php echo $project['id']; ?>">
-                                <?php echo htmlspecialchars($project['title']); ?>
+                                <span class="project-title-text">
+                                    <?php 
+                                    $title = htmlspecialchars($project['title']);
+                                    if (strlen($title) > 18) {
+                                        echo substr($title, 0, 18) . '...';
+                                    } else {
+                                        echo $title;
+                                    }
+                                    ?>
+                                </span>
                                 <span class="supervisor-badge">Supervisor</span>
                             </a>
                         </li>
@@ -325,7 +334,16 @@ if (isset($_SESSION['success'])) {
                     <?php foreach($joined_projects as $project): ?>
                         <li>
                             <a href="project_detail.php?id=<?php echo $project['id']; ?>">
-                                <?php echo htmlspecialchars($project['title']); ?>
+                                <span class="project-title-text">
+                                    <?php 
+                                    $title = htmlspecialchars($project['title']);
+                                    if (strlen($title) > 18) {
+                                        echo substr($title, 0, 18) . '...';
+                                    } else {
+                                        echo $title;
+                                    }
+                                    ?>
+                                </span>
                                 <span class="participant-badge">Participant</span>
                             </a>
                         </li>
@@ -336,7 +354,6 @@ if (isset($_SESSION['success'])) {
                 </ul>
             </div>
         </div>
-
 
         <!-- Main Content -->
         <div class="main-content">
