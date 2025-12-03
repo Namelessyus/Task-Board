@@ -24,9 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                 // Regenerate session ID to prevent session fixation
                 session_regenerate_id(true);
                 
-                $_SESSION['username'] = $row['username'];
-                $_SESSION['userid'] = $row['id'];
-                $_SESSION['email'] = $row['email'];
+                
+    $_SESSION['username'] = $row['username'];
+    $_SESSION['userid'] = $row['id'];
+    $_SESSION['email'] = $row['email'];
+    $_SESSION['loggedin'] = true;
+    $_SESSION['login_time'] = time();
                 
                 // Redirect to dashboard
                 header("Location: dashboard.php");

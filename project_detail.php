@@ -185,26 +185,46 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <title><?php echo htmlspecialchars($project['title']); ?> - Task Board</title>
     <style>
+        /* FLEXBOX SOLUTION - Clean and working */
         .project-header {
             background: white;
             border-radius: 12px;
             padding: 30px;
             margin-bottom: 30px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
         .project-title {
             font-size: 32px;
             font-weight: 700;
             color: #2d3748;
-            margin-bottom: 10px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.3;
+            margin: 0;
+            order: 1;
+        }
+
+        .project-description {
+            color: #4a5568;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            margin: 0;
+            order: 2;
+            padding: 10px 0;
         }
 
         .project-meta {
             display: flex;
             gap: 20px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
+            align-items: center;
+            order: 3;
+            margin: 5px 0;
         }
 
         .meta-item {
@@ -213,12 +233,13 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             gap: 8px;
             color: #718096;
             font-size: 14px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
-        .project-description {
-            color: #4a5568;
-            line-height: 1.6;
-            margin-bottom: 20px;
+        .progress-section {
+            order: 4;
+            margin-top: 10px;
         }
 
         .progress-bar {
@@ -247,6 +268,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             display: flex;
             gap: 15px;
             margin-top: 20px;
+            order: 5;
         }
 
         .btn-manage {
@@ -408,6 +430,109 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             color: #667eea;
             margin-bottom: 10px;
         }
+        
+        /* For mobile responsiveness */
+        @media (max-width: 768px) {
+            .project-title {
+                font-size: 24px;
+            }
+            
+            .project-meta {
+                gap: 10px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .meta-item {
+                white-space: normal;
+                flex-wrap: wrap;
+                font-size: 13px;
+            }
+            
+            .management-actions {
+                flex-direction: column;
+            }
+            
+            .btn-manage {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        /* FLEXBOX SOLUTION - Clean and working */
+.project-header {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.project-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #2d3748;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.3;
+    margin: 0;
+    order: 1;
+}
+
+.project-description {
+    color: #4a5568;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    margin: 0;
+    order: 2;
+    padding: 10px 0;
+}
+
+.project-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    order: 3;
+    margin: 5px 0;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #718096;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.progress-section {
+    order: 4;
+    margin-top: 10px;
+}
+
+/* For mobile responsiveness */
+@media (max-width: 768px) {
+    .project-title {
+        font-size: 24px;
+    }
+    
+    .project-meta {
+        gap: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .meta-item {
+        white-space: normal;
+        flex-wrap: wrap;
+        font-size: 13px;
+    }
+}
     </style>
 </head>
 <body>
@@ -462,52 +587,55 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
         <!-- Main Content -->
         <div class="main-content">
             <!-- Project Header -->
-            <div class="project-header" id="overview">
-                <h1 class="project-title"><?php echo htmlspecialchars($project['title']); ?></h1>
-                
-                <div class="project-meta">
-                    <div class="meta-item">
-                        <i class="fas fa-user-shield"></i>
-                        <span>Supervisor: <?php echo htmlspecialchars($project['supervisor_name']); ?></span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="fas fa-flag"></i>
-                        <span>Priority: <?php echo ucfirst($project['priority']); ?></span>
-                    </div>
-                    <?php if ($project['due_date']): ?>
-                    <div class="meta-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Due: <?php echo date('M j, Y', strtotime($project['due_date'])); ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if ($is_supervisor): ?>
-                    <div class="meta-item">
-                        <i class="fas fa-code"></i>
-                        <span>Join Code: <strong><?php echo $project['join_code']; ?></strong></span>
-                    </div>
-                    <?php endif; ?>
-                </div>
+<div class="project-header" id="overview">
+    <!-- TITLE - FIRST LINE -->
+    <h1 class="project-title"><?php echo htmlspecialchars($project['title']); ?></h1>
+    
+    <?php if ($project['description']): ?>
+    <!-- DESCRIPTION - SECOND LINE -->
+    <div class="project-description">
+        <?php echo nl2br(htmlspecialchars($project['description'])); ?>
+    </div>
+    <?php endif; ?>
 
-                <?php if ($project['description']): ?>
-                <div class="project-description">
-                    <?php echo nl2br(htmlspecialchars($project['description'])); ?>
-                </div>
-                <?php endif; ?>
+    <!-- META ITEMS - THIRD LINE -->
+    <div class="project-meta">
+        <div class="meta-item">
+            <i class="fas fa-user-shield"></i>
+            <span>Supervisor: <?php echo htmlspecialchars($project['supervisor_name']); ?></span>
+        </div>
+        <div class="meta-item">
+            <i class="fas fa-flag"></i>
+            <span>Priority: <?php echo ucfirst($project['priority']); ?></span>
+        </div>
+        <?php if ($project['due_date']): ?>
+        <div class="meta-item">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Due: <?php echo date('M j, Y', strtotime($project['due_date'])); ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($is_supervisor): ?>
+        <div class="meta-item">
+            <i class="fas fa-code"></i>
+            <span>Join Code: <strong><?php echo $project['join_code']; ?></strong></span>
+        </div>
+        <?php endif; ?>
+    </div>
 
-                <!-- Progress Bar -->
-                <div class="progress-section">
-                    <div class="progress-text">
-                        <span>Project Progress</span>
-                        <span><?php echo $progress_percentage; ?>% Complete</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: <?php echo $progress_percentage; ?>%"></div>
-                    </div>
-                    <div class="progress-text">
-                        <span><?php echo $completed_count; ?> of <?php echo $total_tasks; ?> tasks completed</span>
-                    </div>
-                </div>
-            </div>
+    <!-- Progress Bar - FOURTH SECTION -->
+    <div class="progress-section">
+        <div class="progress-text">
+            <span>Project Progress</span> 
+            <span><?php echo $progress_percentage; ?>% Complete</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: <?php echo $progress_percentage; ?>%"></div>
+        </div>
+        <div class="progress-text">
+            <span><?php echo $completed_count; ?> of <?php echo $total_tasks; ?> tasks completed</span>
+        </div>
+    </div>
+</div>
 
             <!-- Success/Error Messages -->
             <?php if (isset($success)): ?>
@@ -748,7 +876,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                     <?php foreach ($project_members as $member): ?>
                                         <option value="<?php echo $member['id']; ?>">
                                             <?php echo htmlspecialchars($member['username']); ?> 
-                                            (<?php echo $member['role']; ?>)
+                                            (<?php echo $member['role']; ?>)>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
