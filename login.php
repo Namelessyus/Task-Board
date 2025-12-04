@@ -19,6 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         if ($result && mysqli_num_rows($result) > 0) {
             $row = mysqli_fetch_assoc($result);
 
+            // Check if account is soft-deleted
+if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
+    $error = "This account has been deactivated. Please contact support.";
+} else if (password_verify($password, $row['password'])) {
+    // ... rest of login logic
+}
+
             // Verify password
             if (password_verify($password, $row['password'])) {
                 // Regenerate session ID to prevent session fixation
