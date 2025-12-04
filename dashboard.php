@@ -472,6 +472,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add draggable functionality
     makeProjectsDraggable();
+    
+    // Setup join code copying
+    setupJoinCodeCopying();
 });
 
 // Simple draggable functionality
@@ -480,24 +483,110 @@ function makeProjectsDraggable() {
     const cards = document.querySelectorAll('.class-card');
     
     cards.forEach(card => {
-        // Make card draggable
-        card.draggable = true;
-        card.style.cursor = 'move';
-        card.style.userSelect = 'none';
+        // Only make project cards draggable (not the "Create New Project" card)
+        const isProjectCard = card.querySelector('.class-header') && 
+                               card.querySelector('.class-title') && 
+                               card.querySelector('.class-body');
         
-        // Drag events
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragover', handleDragOver);
-        card.addEventListener('dragenter', handleDragEnter);
-        card.addEventListener('dragleave', handleDragLeave);
-        card.addEventListener('drop', handleDrop);
-        card.addEventListener('dragend', handleDragEnd);
+        if (isProjectCard) {
+            // Make card draggable
+            card.draggable = true;
+            card.style.cursor = 'move';
+            card.style.userSelect = 'none';
+            
+            // Drag events
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragover', handleDragOver);
+            card.addEventListener('dragenter', handleDragEnter);
+            card.addEventListener('dragleave', handleDragLeave);
+            card.addEventListener('drop', handleDrop);
+            card.addEventListener('dragend', handleDragEnd);
+        } else {
+            // This is the "Create New Project" card - make it non-draggable
+            card.draggable = false;
+            card.style.cursor = 'default';
+        }
+    });
+}
+
+// Setup click-to-copy for join codes
+function setupJoinCodeCopying() {
+    const joinCodes = document.querySelectorAll('.class-code');
+    
+    joinCodes.forEach(codeElement => {
+        // Store original text
+        const originalText = codeElement.textContent;
+        
+        // Add cursor pointer for visual indication
+        codeElement.style.cursor = 'pointer';
+        codeElement.title = 'Click to copy join code';
+        
+        // Add hover effect
+        codeElement.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.05)';
+            this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+        });
+        
+        codeElement.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+            this.style.boxShadow = 'none';
+        });
+        
+        // Add click event listener
+        codeElement.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent card from being dragged
+            e.preventDefault(); // Prevent any default behavior
+            
+            // Store original styles
+            const originalBackground = this.style.background;
+            const originalColor = this.style.color;
+            
+            // Copy text to clipboard
+            navigator.clipboard.writeText(originalText).then(() => {
+                // Show feedback
+                this.textContent = 'Copied!';
+                this.style.background = '#48bb78';
+                this.style.color = 'white';
+                
+                // Reset after 1.5 seconds
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.style.background = originalBackground;
+                    this.style.color = originalColor;
+                }, 1500);
+                
+                // Show notification
+                showNotification('Join code copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                showNotification('Failed to copy code');
+            });
+        });
+        
+        // Prevent drag events on the join code element
+        codeElement.addEventListener('dragstart', function(e) {
+            e.stopPropagation(); // Prevent card drag from starting
+            e.preventDefault(); // Prevent default drag behavior
+        });
+        
+        // Allow text selection on join code
+        codeElement.style.userSelect = 'text';
+        codeElement.style.webkitUserSelect = 'text';
+        codeElement.style.mozUserSelect = 'text';
+        codeElement.style.msUserSelect = 'text';
     });
 }
 
 let draggedCard = null;
 
 function handleDragStart(e) {
+    // Don't start drag if clicking on join code
+    if (e.target.classList.contains('class-code') || 
+        e.target.closest('.class-code')) {
+        e.preventDefault();
+        return;
+    }
+    
     draggedCard = this;
     this.style.opacity = '0.4';
     e.dataTransfer.effectAllowed = 'move';
@@ -532,8 +621,8 @@ function handleDrop(e) {
         // Get the grid
         const grid = document.querySelector('.classroom-grid');
         
-        // Get all cards
-        const cards = Array.from(document.querySelectorAll('.class-card'));
+        // Get all draggable cards only
+        const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
         
         // Get the index of dragged card and target card
         const draggedIndex = cards.indexOf(draggedCard);
@@ -566,7 +655,8 @@ function handleDragEnd(e) {
 
 // Save project order to localStorage
 function saveProjectOrder() {
-    const cards = Array.from(document.querySelectorAll('.class-card'));
+    // Get only draggable cards (project cards)
+    const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
     const projectIds = cards.map(card => {
         // Try to get project ID from data attribute or extract from link
         const link = card.querySelector('a.btn-primary');
@@ -616,7 +706,7 @@ function showNotification(message) {
     }, 2000);
 }
 
-// Add CSS for drag and drop
+// Add CSS for drag and drop and join code styling
 const style = document.createElement('style');
 style.textContent = `
     .class-card.over {
@@ -627,6 +717,12 @@ style.textContent = `
     .class-card.dragging {
         opacity: 0.5;
         transform: rotate(3deg);
+    }
+    
+    /* Join code hover effects */
+    .class-code {
+        transition: all 0.2s ease;
+        cursor: pointer !important;
     }
     
     /* Improve long text handling */
@@ -649,6 +745,11 @@ style.textContent = `
         line-height: 1.4;
         max-height: 2.8em;
     }
+    
+    /* Style for the "Create New Project" card */
+    .class-card:not([draggable="true"]) {
+        cursor: default !important;
+    }
 `;
 document.head.appendChild(style);
 
@@ -659,17 +760,9 @@ window.addEventListener('load', function() {
         try {
             const order = JSON.parse(savedOrder);
             const grid = document.querySelector('.classroom-grid');
-            const cards = Array.from(document.querySelectorAll('.class-card'));
             
-            // Filter cards that have project IDs
-            const projectCards = cards.filter(card => {
-                const link = card.querySelector('a.btn-primary');
-                if (link) {
-                    const url = new URL(link.href, window.location.origin);
-                    return url.searchParams.get('id');
-                }
-                return false;
-            });
+            // Get only draggable cards (project cards)
+            const projectCards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
             
             // Sort based on saved order
             projectCards.sort((a, b) => {
@@ -684,11 +777,20 @@ window.addEventListener('load', function() {
                 return indexA - indexB;
             });
             
-            // Get the "Create New Project" card
-            const createCard = cards.find(card => !card.querySelector('a.btn-primary'));
+            // Get the "Create New Project" card (non-draggable)
+            const createCard = document.querySelector('.class-card:not([draggable="true"])');
             
-            // Reorder in DOM
-            projectCards.forEach(card => grid.appendChild(card));
+            // Clear the grid first
+            while (grid.firstChild) {
+                grid.removeChild(grid.firstChild);
+            }
+            
+            // Add sorted project cards
+            projectCards.forEach(card => {
+                grid.appendChild(card);
+            });
+            
+            // Add create card at the end
             if (createCard) {
                 grid.appendChild(createCard);
             }
@@ -698,6 +800,5 @@ window.addEventListener('load', function() {
     }
 });
 </script>
-    
 </body>
 </html>
