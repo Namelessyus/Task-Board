@@ -1,5 +1,3 @@
-[file name]: create_project.php
-[file content begin]
 <?php
 session_start();
 include('connect.php');
@@ -317,4 +315,3 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </script>
 </body>
 </html>
-[file content end]
