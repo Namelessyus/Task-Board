@@ -133,6 +133,14 @@ $stats = mysqli_fetch_assoc($stats_result);
             line-height: 1.6;
         }
 
+        /* Reset for avatar */
+        .profile-avatar,
+        .profile-avatar * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         /* Header - Match your existing style */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -252,8 +260,9 @@ $stats = mysqli_fetch_assoc($stats_result);
         
         .profile-avatar {
             width: 90px;
+            min-width: 90px;
             height: 90px;
-            border-radius: 50%;
+            border-radius: 1000px !important;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
@@ -262,6 +271,9 @@ $stats = mysqli_fetch_assoc($stats_result);
             font-size: 36px;
             font-weight: bold;
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            flex-shrink: 0;
         }
         
         .profile-info h2 {
@@ -556,13 +568,16 @@ $stats = mysqli_fetch_assoc($stats_result);
         .achievement-icon {
             width: 50px;
             height: 50px;
-            border-radius: 12px;
+            min-width: 50px;
+            border-radius: 1000px !important;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-size: 20px;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
         }
         
         .achievement-info h4 {

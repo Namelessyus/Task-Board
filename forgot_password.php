@@ -26,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (mysqli_query($conn, $update_sql)) {
                 // In a real application, you would send an email here
                 // For this demo, we'll just show the reset link
-                $reset_link = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset_password.php?token=$token";
-                $success = "Password reset link generated!<br>For demo purposes, here's your reset link:<br><strong><a href='$reset_link'>$reset_link</a></strong><br>In a real system, this would be sent to your email.";
+                $reset_link = "needs updates";
+                $success = "Password reset link generated!<br<strong><a href='$reset_link'>$reset_link</a></strong><br>";
             } else {
                 $error = "Error generating reset link: " . mysqli_error($conn);
             }
@@ -172,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="container">
         <h2><i class="fas fa-key"></i> Forgot Password</h2>
-        <p>Enter your email address and we'll send you a link to reset your password.</p>
+        <p>Enter your email address and link will be sent to reset your password.</p>
         
         <?php if (!empty($success)): ?>
             <div class="success"><?php echo $success; ?></div>
@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
         
         <div class="info-box">
-            <strong>Note:</strong> This is a demo system. In a real application, the reset link would be sent to your email.
+            <strong>Note:</strong> Under Maintainance hehe
         </div>
         
         <a href="login.php" class="back-link">← Back to Login</a>

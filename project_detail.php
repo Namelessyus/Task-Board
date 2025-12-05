@@ -69,28 +69,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
         $assigned_to = "'" . intval($assigned_to) . "'";
     }
     
-    // Handle due_date properly
+    // Handle due_date properly with validation
     $task_due_date = $_POST['task_due_date'];
     if (empty($task_due_date)) {
         $task_due_date = "NULL";
     } else {
-        $task_due_date = "'$task_due_date'";
+        // Validate due date - must be today or in the future
+        $today = date('Y-m-d');
+        if ($task_due_date < $today) {
+            $error = "Task due date cannot be in the past! Please select today or a future date.";
+        } else {
+            $task_due_date = "'$task_due_date'";
+        }
     }
     
-    if (!empty($task_title)) {
-        $task_sql = "INSERT INTO tasks (project_id, title, description, assigned_to, priority, due_date, created_by) 
-                     VALUES ('$project_id', '$task_title', '$task_description', $assigned_to, '$task_priority', $task_due_date, '$user_id')";
-        
-        if (mysqli_query($conn, $task_sql)) {
-            $success = "Task created successfully!";
-            // Refresh to show the new task
-            header("Location: project_detail.php?id=$project_id&manage=true");
-            exit();
+    if (empty($error)) {
+        if (!empty($task_title)) {
+            $task_sql = "INSERT INTO tasks (project_id, title, description, assigned_to, priority, due_date, created_by) 
+                         VALUES ('$project_id', '$task_title', '$task_description', $assigned_to, '$task_priority', $task_due_date, '$user_id')";
+            
+            if (mysqli_query($conn, $task_sql)) {
+                $success = "Task created successfully!";
+                // Refresh to show the new task
+                header("Location: project_detail.php?id=$project_id&manage=true");
+                exit();
+            } else {
+                $error = "Error creating task: " . mysqli_error($conn);
+            }
         } else {
-            $error = "Error creating task: " . mysqli_error($conn);
+            $error = "Task title is required!";
         }
-    } else {
-        $error = "Task title is required!";
     }
 }
 
@@ -607,9 +615,10 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-            <a href="dashboard.php">Home</a>
-            <a href="create_project.php">Create Project</a>
-            <a href="join_project.php">Join Project</a>
+            <a href="dashboard.php" class="active">Home</a>
+    <a href="create_project.php">Create Project</a>
+    <a href="join_project.php">Join Project</a>
+    <a href="account.php">Account</a>
         </nav>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
@@ -951,7 +960,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                 <!-- Task Creation Form -->
                 <div class="task-form" id="taskForm">
                     <h3><i class="fas fa-plus-circle"></i> Create New Task</h3>
-                    <form method="POST" action="">
+                    <form method="POST" action="" onsubmit="return validateTaskDueDate()">
                         <div class="form-grid">
                             <div class="form-full">
                                 <input type="text" name="task_title" class="form-input" placeholder="Task title" required>
@@ -978,7 +987,8 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                 </select>
                             </div>
                             <div class="form-full">
-                                <input type="date" name="task_due_date" class="form-input">
+                                <input type="date" name="task_due_date" class="form-input" id="task_due_date" min="<?php echo date('Y-m-d'); ?>">
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Select today or a future date (optional)</small>
                             </div>
                         </div>
                         <button type="submit" name="create_task" class="btn-manage btn-primary">
@@ -1083,6 +1093,35 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
         function confirmTaskDelete(form) {
             return confirm('Are you sure you want to delete this task?');
         }
+        
+        // Task due date validation
+        function validateTaskDueDate() {
+            const taskDueDateInput = document.getElementById('task_due_date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (taskDueDateInput.value && taskDueDateInput.value < today) {
+                alert('Task due date cannot be in the past! Please select today or a future date.');
+                taskDueDateInput.focus();
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Set minimum date for task due date
+        document.addEventListener('DOMContentLoaded', function() {
+            const taskDueDateInput = document.getElementById('task_due_date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (taskDueDateInput) {
+                taskDueDateInput.min = today;
+                
+                // If there's a previous value that's in the past, clear it
+                if (taskDueDateInput.value && taskDueDateInput.value < today) {
+                    taskDueDateInput.value = today;
+                }
+            }
+        });
     </script>
 </body>
 </html>

@@ -22,24 +22,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($title)) {
         $error = "Project name is required!";
     } else {
-        // Generate unique join code
-        $join_code = generateJoinCode($conn);
+        // Validate due date - must be today or in the future
+        if (!empty($due_date)) {
+            $today = date('Y-m-d');
+            if ($due_date < $today) {
+                $error = "Due date cannot be in the past! Please select today or a future date.";
+            }
+        }
         
-        // Insert into projects table
-        $sql = "INSERT INTO projects (title, description, supervisor_id, due_date, priority, join_code) 
-                VALUES ('$title', '$description', '$user_id', '$due_date', '$priority', '$join_code')";
-        
-        if (mysqli_query($conn, $sql)) {
-            $project_id = mysqli_insert_id($conn);
+        if (empty($error)) {
+            // Generate unique join code
+            $join_code = generateJoinCode($conn);
             
-            // Add creator as project member
-            $member_sql = "INSERT INTO project_members (project_id, user_id, role) VALUES ('$project_id', '$user_id', 'general')";
-            mysqli_query($conn, $member_sql);
+            // Insert into projects table
+            $sql = "INSERT INTO projects (title, description, supervisor_id, due_date, priority, join_code) 
+                    VALUES ('$title', '$description', '$user_id', '$due_date', '$priority', '$join_code')";
             
-            $success = "Project created successfully!<br>Share this join code: <strong>$join_code</strong>";
-            $_POST = array();
-        } else {
-            $error = "Error: " . mysqli_error($conn);
+            if (mysqli_query($conn, $sql)) {
+                $project_id = mysqli_insert_id($conn);
+                
+                // Add creator as project member
+                $member_sql = "INSERT INTO project_members (project_id, user_id, role) VALUES ('$project_id', '$user_id', 'general')";
+                mysqli_query($conn, $member_sql);
+                
+                $success = "Project created successfully!<br>Share this join code: <strong>$join_code</strong>";
+                $_POST = array();
+            } else {
+                $error = "Error: " . mysqli_error($conn);
+            }
         }
     }
 }
@@ -207,65 +217,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             text-align: center;
         }
 
-        .footer {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 0;
-            margin-top: auto;
-        }
-
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 24px;
-            display: flex;
-            justify-content: space-between; 
-            align-items: flex-start;
-        }
-
-        .footer-section h3 {
-            margin-bottom: 16px;
-            font-size: 18px;
-        }
-
-        .footer-section p, .footer-section a {
-            color: rgba(255,255,255,0.8);
-            text-decoration: none;
-            line-height: 1.6;
-        }
-
-        .footer-section a:hover {
-            color: white;
-        }
-
-        .social-links {
-            display: flex;
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .social-link {
-            width: 32px;
-            height: 32px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-        }
-
-        .social-link:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        .footer-bottom {
-            text-align: center;
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            color: rgba(255,255,255,0.6);
-        }
     </style>
 </head>
 <body>
@@ -289,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="success"><?php echo $success; ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="">
+            <form method="POST" action="" onsubmit="return validateDueDate()">
                 <div class="form-group">
                     <label for="title">Project Name:</label>
                     <input type="text" id="title" name="title" required 
@@ -304,9 +255,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 
                 <div class="form-group">
-                    <label for="due_date">Due Date:</label>
+                    <label for="due_date">Due Date (Optional):</label>
                     <input type="date" id="due_date" name="due_date"
-                           value="<?php echo isset($_POST['due_date']) ? $_POST['due_date'] : ''; ?>">
+                           value="<?php echo isset($_POST['due_date']) ? $_POST['due_date'] : ''; ?>"
+                           min="<?php echo date('Y-m-d'); ?>">
+                    <small style="color: #666; font-size: 14px;">Select today or a future date</small>
                 </div>
                 
                 <div class="form-group">
@@ -324,112 +277,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <a href="dashboard.php" class="back-link">← Back to Dashboard</a>
         </div>
     </div>
-<!-- Sidebar -->
-<div class="sidebar">
-    <div class="sidebar-section">
-        <h3>Project Navigation</h3>
-        <ul class="project-list">
-            <li><a href="#overview">Overview</a></li>
-            <?php if (!$manage_mode): ?>
-                <li><a href="#members">Team Members</a></li>
-                <li><a href="#tasks">Tasks</a></li>
-                <li><a href="#progress-charts">Progress Charts</a></li>
-            <?php else: ?>
-                <li><a href="#manage">Manage Project</a></li>
-            <?php endif; ?>
-        </ul>
-    </div>
     
-    <!-- Progress Stats -->
-    <div class="sidebar-stats">
-        <h3>Quick Stats</h3>
-        <div class="stat-item">
-            <span class="stat-label">Total Tasks</span>
-            <span class="stat-value"><?php echo $total_tasks; ?></span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Completed</span>
-            <span class="stat-value"><?php echo $completed_count; ?></span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">In Progress</span>
-            <span class="stat-value"><?php echo count($in_progress_tasks); ?></span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Pending</span>
-            <span class="stat-value"><?php echo count($pending_tasks); ?></span>
-        </div>
-    </div>
-    
-    <div class="quick-actions">
-        <?php if ($is_supervisor): ?>
-            <?php if ($manage_mode): ?>
-                <a href="project_detail.php?id=<?php echo $project_id; ?>" class="quick-btn btn-primary">
-                    <i class="fas fa-eye"></i> View Project
-                </a>
-            <?php else: ?>
-                <a href="project_detail.php?id=<?php echo $project_id; ?>&manage=true" class="quick-btn btn-warning">
-                    <i class="fas fa-cog"></i> Manage Project
-                </a>
-            <?php endif; ?>
-        <?php endif; ?>
-        <a href="dashboard.php" class="quick-btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
-        </a>
-    </div>
-</div>
- <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-section">
-                <div class="logo">
-                    <a href="index.html"><i class="fas fa-tasks"></i> Task Board</a>
-                </div>
-                <p>A modern solution for project management and <br>
-                    task tracking designed for academic teams and beyond.</p>
-            </div>
-
-            <div class="footer-section">
-                <h3>Contact Us</h3>
-                <p><i class="fa fa-envelope" style="font-size:16px"></i> contact@taskboard.com</p>
-                <p><i class="fa fa-phone" style="font-size:16px"></i> +977 1234567891</p>
-                <div class="social-links">
-                    <a href="#" class="social-link">
-                        <i class="fa fa-twitter" style="font-size:16px"></i>
-                    </a>
-                    <a href="#" class="social-link">
-                        <i class="fa fa-instagram" style="font-size:16px"></i>
-                    </a>
-                    <a href="https://www.facebook.com/" class="social-link">
-                        <i class="fa fa-facebook-square" style="font-size:16px"></i>
-                    </a>
-                    <a href="https://www.linkedin.com/" class="social-link">
-                        <i class="fa fa-linkedin-square" style="font-size:16px"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer-bottom">
-            <p>&copy; 2025 Task Board. All rights reserved.</p>
-        </div>
-    </footer>
-    // In create_project.php form section, add this script
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dueDateInput = document.getElementById('due_date');
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (dueDateInput) {
-        dueDateInput.min = today;
-    }
-    
-    // For task due date
-    const taskDueDate = document.querySelector('input[name="task_due_date"]');
-    if (taskDueDate) {
-        taskDueDate.min = today;
-    }
-});
-</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dueDateInput = document.getElementById('due_date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (dueDateInput) {
+                dueDateInput.min = today;
+                
+                // If there's a previous value that's in the past, clear it
+                if (dueDateInput.value && dueDateInput.value < today) {
+                    dueDateInput.value = today;
+                }
+            }
+        });
+        
+        function validateDueDate() {
+            const dueDateInput = document.getElementById('due_date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (dueDateInput.value && dueDateInput.value < today) {
+                alert('Due date cannot be in the past! Please select today or a future date.');
+                dueDateInput.focus();
+                return false;
+            }
+            
+            return true;
+        }
+    </script>
 </body>
 </html>
