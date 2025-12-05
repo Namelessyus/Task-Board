@@ -1,3 +1,5 @@
+[file name]: create_project.php
+[file content begin]
 <?php
 session_start();
 include('connect.php');
@@ -34,9 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Generate unique join code
             $join_code = generateJoinCode($conn);
             
+            // Handle empty due date properly - set to NULL instead of empty string
+            if (empty($due_date)) {
+                $due_date_sql = "NULL";
+            } else {
+                $due_date_sql = "'$due_date'";
+            }
+            
             // Insert into projects table
             $sql = "INSERT INTO projects (title, description, supervisor_id, due_date, priority, join_code) 
-                    VALUES ('$title', '$description', '$user_id', '$due_date', '$priority', '$join_code')";
+                    VALUES ('$title', '$description', '$user_id', $due_date_sql, '$priority', '$join_code')";
             
             if (mysqli_query($conn, $sql)) {
                 $project_id = mysqli_insert_id($conn);
@@ -259,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="date" id="due_date" name="due_date"
                            value="<?php echo isset($_POST['due_date']) ? $_POST['due_date'] : ''; ?>"
                            min="<?php echo date('Y-m-d'); ?>">
-                    <small style="color: #666; font-size: 14px;">Select today or a future date</small>
+                    <small style="color: #666; font-size: 14px;">Select today or a future date (leave empty for no deadline)</small>
                 </div>
                 
                 <div class="form-group">
@@ -298,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const today = new Date().toISOString().split('T')[0];
             
             if (dueDateInput.value && dueDateInput.value < today) {
-                alert('Due date cannot be in the past! Please select today or a future date.');
+                alert('Due date cannot be in the past! Please select today or a future date, or leave it empty for no deadline.');
                 dueDateInput.focus();
                 return false;
             }
@@ -308,3 +317,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </script>
 </body>
 </html>
+[file content end]

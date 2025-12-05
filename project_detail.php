@@ -55,19 +55,14 @@ if ($manage_mode && !$is_supervisor) {
     exit();
 }
 
-// Handle task creation (only for supervisors)
+// Handle task creation (only for supervisors) - WITH MULTIPLE ASSIGNMENTS
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_supervisor) {
     $task_title = mysqli_real_escape_string($conn, $_POST['task_title']);
     $task_description = mysqli_real_escape_string($conn, $_POST['task_description']);
     $task_priority = $_POST['task_priority'];
     
-    // Handle assigned_to properly
-    $assigned_to = $_POST['assigned_to'];
-    if (empty($assigned_to)) {
-        $assigned_to = "NULL";
-    } else {
-        $assigned_to = "'" . intval($assigned_to) . "'";
-    }
+    // Get selected assignees (array of user IDs)
+    $assignees = isset($_POST['assignees']) ? $_POST['assignees'] : array();
     
     // Handle due_date properly with validation
     $task_due_date = $_POST['task_due_date'];
@@ -85,10 +80,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
     
     if (empty($error)) {
         if (!empty($task_title)) {
+            // Insert the task (assigned_to is NULL since we're using multiple assignments)
             $task_sql = "INSERT INTO tasks (project_id, title, description, assigned_to, priority, due_date, created_by) 
-                         VALUES ('$project_id', '$task_title', '$task_description', $assigned_to, '$task_priority', $task_due_date, '$user_id')";
+                         VALUES ('$project_id', '$task_title', '$task_description', NULL, '$task_priority', $task_due_date, '$user_id')";
             
             if (mysqli_query($conn, $task_sql)) {
+                $task_id = mysqli_insert_id($conn); // Get the ID of the newly created task
+                
+                // Insert assignments for each selected user
+                if (!empty($assignees) && is_array($assignees)) {
+                    foreach ($assignees as $assignee_id) {
+                        $assignee_id = intval($assignee_id);
+                        if ($assignee_id > 0) {
+                            $assign_sql = "INSERT INTO task_assignments (task_id, user_id) 
+                                          VALUES ('$task_id', '$assignee_id')";
+                            mysqli_query($conn, $assign_sql);
+                        }
+                    }
+                }
+                
                 $success = "Task created successfully!";
                 // Refresh to show the new task
                 header("Location: project_detail.php?id=$project_id&manage=true");
@@ -171,24 +181,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $
     }
 }
 
-// Get project members
-$members_sql = "SELECT u.id, u.username, pm.role 
-                FROM project_members pm 
-                JOIN users u ON pm.user_id = u.id 
-                WHERE pm.project_id = '$project_id' 
-                ORDER BY pm.role, u.username";
+// Get ALL project members INCLUDING SUPERVISOR for task assignment
+$members_sql = "SELECT u.id, u.username, 
+                CASE 
+                    WHEN u.id = '" . $project['supervisor_id'] . "' THEN 'supervisor'
+                    ELSE COALESCE(pm.role, 'supervisor') 
+                END as role
+                FROM users u
+                LEFT JOIN project_members pm ON u.id = pm.user_id AND pm.project_id = '$project_id'
+                WHERE u.id = '" . $project['supervisor_id'] . "' 
+                OR pm.project_id = '$project_id'
+                GROUP BY u.id
+                ORDER BY 
+                    CASE 
+                        WHEN u.id = '" . $project['supervisor_id'] . "' THEN 1
+                        ELSE 2
+                    END,
+                    u.username";
 $members_result = mysqli_query($conn, $members_sql);
 $project_members = [];
 while ($row = mysqli_fetch_assoc($members_result)) {
     $project_members[] = $row;
 }
 
-// Get tasks for this project (excluding soft-deleted)
-$tasks_sql = "SELECT t.*, u.username as assigned_username, creator.username as creator_name
+// Get tasks for this project (excluding soft-deleted) with multiple assignees
+$tasks_sql = "SELECT t.*, creator.username as creator_name,
+              GROUP_CONCAT(DISTINCT u.username ORDER BY u.username SEPARATOR ', ') as assigned_usernames
               FROM tasks t 
-              LEFT JOIN users u ON t.assigned_to = u.id 
               JOIN users creator ON t.created_by = creator.id
+              LEFT JOIN task_assignments ta ON t.id = ta.task_id
+              LEFT JOIN users u ON ta.user_id = u.id
               WHERE t.project_id = '$project_id' AND t.is_deleted = 0
+              GROUP BY t.id
               ORDER BY 
                 CASE t.priority 
                     WHEN 'high' THEN 1 
@@ -371,6 +395,30 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             border-color: #667eea;
             outline: none;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Style for multiple select */
+        .multiple-select {
+            height: 120px;
+            padding: 8px;
+        }
+
+        .multiple-select option {
+            padding: 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+        }
+
+        .multiple-select option:hover {
+            background-color: #667eea;
+            color: white;
+        }
+
+        .selected-count {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 5px;
+            display: block;
         }
 
         .members-list {
@@ -633,10 +681,12 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                     <li><a href="#overview">Overview</a></li>
                     <?php if (!$manage_mode): ?>
                         <li><a href="#members">Team Members</a></li>
-                        <li><a href="#tasks">Tasks</a></li>
+                        <li><a href="#tasks">Task Board</a></li>
                     <?php else: ?>
                         <li><a href="#manage">Manage Project</a></li>
                     <?php endif; ?>
+                    <!-- Always show All Tasks link -->
+                    <li><a href="#all-tasks">All Tasks</a></li>
                 </ul>
             </div>
             
@@ -729,8 +779,8 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             <div class="member-info">
                                 <i class="fas fa-user"></i>
                                 <span><?php echo htmlspecialchars($member['username']); ?></span>
-                                <span class="member-role <?php echo $member['id'] == $project['supervisor_id'] ? 'supervisor-badge' : ''; ?>">
-                                    <?php echo $member['id'] == $project['supervisor_id'] ? 'Supervisor' : ucfirst($member['role']); ?>
+                                <span class="member-role <?php echo $member['role'] == 'supervisor' ? 'supervisor-badge' : ''; ?>">
+                                    <?php echo ucfirst($member['role']); ?>
                                 </span>
                             </div>
                         </div>
@@ -772,10 +822,10 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                                 <span class="task-due">Due <?php echo date('M j', strtotime($task['due_date'])); ?></span>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if ($task['assigned_username']): ?>
+                                        <?php if ($task['assigned_usernames']): ?>
                                             <div class="task-assignee">
-                                                <i class="fas fa-user"></i>
-                                                <span><?php echo htmlspecialchars($task['assigned_username']); ?></span>
+                                                <i class="fas fa-users"></i>
+                                                <span>Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?></span>
                                             </div>
                                         <?php endif; ?>
                                         <div class="status-actions">
@@ -827,10 +877,10 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                                 <span class="task-due">Due <?php echo date('M j', strtotime($task['due_date'])); ?></span>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if ($task['assigned_username']): ?>
+                                        <?php if ($task['assigned_usernames']): ?>
                                             <div class="task-assignee">
-                                                <i class="fas fa-user"></i>
-                                                <span><?php echo htmlspecialchars($task['assigned_username']); ?></span>
+                                                <i class="fas fa-users"></i>
+                                                <span>Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?></span>
                                             </div>
                                         <?php endif; ?>
                                         <div class="status-actions">
@@ -887,10 +937,10 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                             </span>
                                             <span class="task-due">Completed</span>
                                         </div>
-                                        <?php if ($task['assigned_username']): ?>
+                                        <?php if ($task['assigned_usernames']): ?>
                                             <div class="task-assignee">
-                                                <i class="fas fa-user"></i>
-                                                <span><?php echo htmlspecialchars($task['assigned_username']); ?></span>
+                                                <i class="fas fa-users"></i>
+                                                <span>Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?></span>
                                             </div>
                                         <?php endif; ?>
                                         <div class="status-actions">
@@ -910,6 +960,50 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- All Tasks List (View Mode) -->
+                <div class="members-list" id="all-tasks">
+                    <h3><i class="fas fa-list"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
+                    <?php foreach ($tasks as $task): ?>
+                        <div class="member-item">
+                            <div class="member-info">
+                                <i class="fas fa-task"></i>
+                                <span>
+                                    <strong><?php echo htmlspecialchars($task['title']); ?></strong> - 
+                                    <span class="task-priority priority-<?php echo $task['priority']; ?>" style="font-size: 11px;">
+                                        <?php echo ucfirst($task['priority']); ?> Priority
+                                    </span> - 
+                                    <span style="color: #718096; font-size: 12px;">
+                                        Status: <?php echo ucfirst(str_replace('_', ' ', $task['status'])); ?>
+                                    </span>
+                                    <?php if ($task['assigned_usernames']): ?>
+                                        <span style="color: #667eea; font-size: 12px;">
+                                            (Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                    <?php if ($task['due_date']): ?>
+                                        <span style="color: #e53e3e; font-size: 12px;">
+                                            (Due: <?php echo date('M j, Y', strtotime($task['due_date'])); ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <div>
+                                <span class="member-role" style="background: 
+                                    <?php 
+                                    if ($task['status'] == 'completed') echo '#10b981';
+                                    elseif ($task['status'] == 'in_progress') echo '#f59e0b';
+                                    else echo '#667eea';
+                                    ?>">
+                                    <?php echo ucfirst(str_replace('_', ' ', $task['status'])); ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($tasks)): ?>
+                        <div class="no-tasks">No tasks yet.</div>
+                    <?php endif; ?>
                 </div>
 
             <!-- MANAGE MODE: Management Features -->
@@ -960,7 +1054,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                 <!-- Task Creation Form -->
                 <div class="task-form" id="taskForm">
                     <h3><i class="fas fa-plus-circle"></i> Create New Task</h3>
-                    <form method="POST" action="" onsubmit="return validateTaskDueDate()">
+                    <form method="POST" action="" onsubmit="return validateTaskForm()">
                         <div class="form-grid">
                             <div class="form-full">
                                 <input type="text" name="task_title" class="form-input" placeholder="Task title" required>
@@ -968,16 +1062,17 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                             <div class="form-full">
                                 <textarea name="task_description" class="form-input" placeholder="Task description" rows="3"></textarea>
                             </div>
-                            <div>
-                                <select name="assigned_to" class="form-input">
-                                    <option value="">Assign to (optional)</option>
+                            <div class="form-full">
+                                <label for="assignees">Assign to team members (optional - hold CTRL/CMD to select multiple):</label>
+                                <select name="assignees[]" class="form-input multiple-select" id="assignees" multiple>
                                     <?php foreach ($project_members as $member): ?>
                                         <option value="<?php echo $member['id']; ?>">
                                             <?php echo htmlspecialchars($member['username']); ?> 
-                                            (<?php echo $member['role']; ?>)
+                                            (<?php echo ucfirst($member['role']); ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <span class="selected-count" id="selectedCount">0 members selected</span>
                             </div>
                             <div>
                                 <select name="task_priority" class="form-input">
@@ -986,7 +1081,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                     <option value="high">High Priority</option>
                                 </select>
                             </div>
-                            <div class="form-full">
+                            <div>
                                 <input type="date" name="task_due_date" class="form-input" id="task_due_date" min="<?php echo date('Y-m-d'); ?>">
                                 <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Select today or a future date (optional)</small>
                             </div>
@@ -998,7 +1093,7 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                 </div>
                 
                 <!-- Task List for Management -->
-                <div class="members-list">
+                <div class="members-list" id="all-tasks">
                     <h3><i class="fas fa-tasks"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
                     <?php foreach ($tasks as $task): ?>
                         <div class="member-item">
@@ -1012,9 +1107,9 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                                     <span style="color: #718096; font-size: 12px;">
                                         Status: <?php echo ucfirst(str_replace('_', ' ', $task['status'])); ?>
                                     </span>
-                                    <?php if ($task['assigned_username']): ?>
+                                    <?php if ($task['assigned_usernames']): ?>
                                         <span style="color: #667eea; font-size: 12px;">
-                                            (Assigned to: <?php echo htmlspecialchars($task['assigned_username']); ?>)
+                                            (Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?>)
                                         </span>
                                     <?php endif; ?>
                                 </span>
@@ -1094,8 +1189,8 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             return confirm('Are you sure you want to delete this task?');
         }
         
-        // Task due date validation
-        function validateTaskDueDate() {
+        // Task form validation
+        function validateTaskForm() {
             const taskDueDateInput = document.getElementById('task_due_date');
             const today = new Date().toISOString().split('T')[0];
             
@@ -1106,6 +1201,26 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
             }
             
             return true;
+        }
+        
+        // Update selected count for multiple select
+        function updateSelectedCount() {
+            const selectElement = document.getElementById('assignees');
+            const selectedCount = document.getElementById('selectedCount');
+            const selectedOptions = Array.from(selectElement.selectedOptions);
+            
+            selectedCount.textContent = selectedOptions.length + ' member(s) selected';
+            
+            // Add visual feedback for selected options
+            Array.from(selectElement.options).forEach(option => {
+                if (option.selected) {
+                    option.style.backgroundColor = '#667eea';
+                    option.style.color = 'white';
+                } else {
+                    option.style.backgroundColor = '';
+                    option.style.color = '';
+                }
+            });
         }
         
         // Set minimum date for task due date
@@ -1121,7 +1236,35 @@ $progress_percentage = $total_tasks > 0 ? round(($completed_count / $total_tasks
                     taskDueDateInput.value = today;
                 }
             }
+            
+            // Initialize selected count for assignees
+            const assigneesSelect = document.getElementById('assignees');
+            if (assigneesSelect) {
+                assigneesSelect.addEventListener('change', updateSelectedCount);
+                updateSelectedCount(); // Initial call
+            }
+            
+            // Keyboard shortcuts for multiple selection
+            assigneesSelect.addEventListener('keydown', function(e) {
+                // Allow Ctrl+A to select all
+                if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    Array.from(this.options).forEach(option => {
+                        option.selected = true;
+                    });
+                    updateSelectedCount();
+                }
+            });
         });
+        
+        // Helper function to select/deselect all members
+        function toggleSelectAll(selectAll) {
+            const selectElement = document.getElementById('assignees');
+            Array.from(selectElement.options).forEach(option => {
+                option.selected = selectAll;
+            });
+            updateSelectedCount();
+        }
     </script>
 </body>
 </html>
