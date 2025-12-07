@@ -1,6 +1,4 @@
 <?php
-// session_check.php - Include this at the top of ALL protected pages (dashboard.php, etc.)
-
 session_start();
 
 // Check if user is logged in
