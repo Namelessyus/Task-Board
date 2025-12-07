@@ -20,23 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             $row = mysqli_fetch_assoc($result);
 
             // Check if account is soft-deleted
-if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
-    $error = "This account has been deactivated. Please contact support.";
-} else if (password_verify($password, $row['password'])) {
-    // ... rest of login logic
-}
-
-            // Verify password
-            if (password_verify($password, $row['password'])) {
+            if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
+                $error = "This account has been deactivated. <a href='recover_account.php' style='color: #e53e3e;'>Click here to recover it</a> within 30 days.";
+            } else if (password_verify($password, $row['password'])) {
                 // Regenerate session ID to prevent session fixation
                 session_regenerate_id(true);
                 
-                
-    $_SESSION['username'] = $row['username'];
-    $_SESSION['userid'] = $row['id'];
-    $_SESSION['email'] = $row['email'];
-    $_SESSION['loggedin'] = true;
-    $_SESSION['login_time'] = time();
+                $_SESSION['username'] = $row['username'];
+                $_SESSION['userid'] = $row['id'];
+                $_SESSION['email'] = $row['email'];
+                $_SESSION['loggedin'] = true;
+                $_SESSION['login_time'] = time();
                 
                 // Redirect to dashboard
                 header("Location: dashboard.php");
@@ -57,6 +51,7 @@ if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Task Board</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: sans-serif;
@@ -112,6 +107,7 @@ if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
         .form-footer {
             text-align: center;
             margin-top: 15px;
+            color: #666;
         }
 
         .form-footer a {
@@ -124,13 +120,54 @@ if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
         }
 
         .error {
-            color: red;
+            color: #e53e3e;
             text-align: center;
             margin-bottom: 15px;
             padding: 10px;
-            background: #ffebee;
+            background: #fff5f5;
             border-radius: 8px;
-            border: 1px solid #ffcdd2;
+            border: 1px solid #fed7d7;
+            font-size: 14px;
+        }
+
+        .error a {
+            color: #e53e3e;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .form-links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+
+        .link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .recover-link {
+            color: #e53e3e;
+        }
+
+        .signup-link {
+            display: block;
+            text-align: center;
+            margin-top: 5px;
+            color: #666;
         }
     </style>
 </head>
@@ -147,6 +184,15 @@ if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit" name="login">Login</button>
         </form>
+        
+        <div class="form-links">
+            <a href="forgot_password.php" class="link">
+                <i class="fas fa-key"></i> Forgot Password?
+            </a>
+            <a href="recover_account.php" class="link recover-link">
+                <i class="fas fa-user-slash"></i> Recover Account
+            </a>
+        </div>
         
         <div class="form-footer">
             Don't have an account? <a href="signup.html">Sign Up</a>
