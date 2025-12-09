@@ -2,7 +2,16 @@
 session_start();
 include('connect.php');
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// Check if user is already logged in
+if (isset($_SESSION['userid']) && isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
+    header("Location: dashboard.php");
+    exit();
+}
+
+$error = "";
+$success = "";
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['signup'])) {
     $fullname = mysqli_real_escape_string($conn, $_POST['fullname']);
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password'];
@@ -10,38 +19,203 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Check if username contains numbers
     if (preg_match('/[0-9]/', $fullname)) {
-        die("Username should not contain numbers. <a href='signup.html'>Go back</a>");
-    }
-
-    // Check if passwords match
-    if ($password !== $confirm_password) {
-        die("Passwords do not match. <a href='signup.html'>Go back</a>");
-    }
-
-    // Hash the password
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-
-    // Check if email already exists
-    $check_email = "SELECT * FROM users WHERE email='$email'";
-    $result = mysqli_query($conn, $check_email);
-
-    if (mysqli_num_rows($result) > 0) {
-        die("Email already registered. <a href='signup.html'>Try again</a> <br>
-        Try <a href='login.html'>Login </a>");
-    }
-
-    // Insert user into database (no role field)
-    $insert_user = "INSERT INTO users (username, email, password) VALUES ('$fullname', '$email', '$hashed_password')";
-
-    if (mysqli_query($conn, $insert_user)) {
-        // Set session and go directly to dashboard
-        $_SESSION['userid'] = mysqli_insert_id($conn);
-        $_SESSION['username'] = $fullname;
-        
-        header("Location: dashboard.php");
-        exit();
+        $error = "Username should not contain numbers.";
+    } elseif ($password !== $confirm_password) {
+        $error = "Passwords do not match.";
+    } elseif (strlen($password) < 6) {
+        $error = "Password must be at least 6 characters.";
     } else {
-        die("Error: " . mysqli_error($conn));
+        // Check if email already exists
+        $check_email = "SELECT * FROM users WHERE email='$email'";
+        $result = mysqli_query($conn, $check_email);
+
+        if ($result && mysqli_num_rows($result) > 0) {
+            $error = "Email already registered. <a href='login.php'>Try login instead</a>";
+        } else {
+            // Hash the password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+            // Insert user into database
+            $insert_user = "INSERT INTO users (username, email, password) VALUES ('$fullname', '$email', '$hashed_password')";
+
+            if (mysqli_query($conn, $insert_user)) {
+                // Auto-login after signup
+                $_SESSION['userid'] = mysqli_insert_id($conn);
+                $_SESSION['username'] = $fullname;
+                $_SESSION['email'] = $email;
+                $_SESSION['loggedin'] = true;
+                
+                header("Location: dashboard.php");
+                exit();
+            } else {
+                $error = "Error: " . mysqli_error($conn);
+            }
+        }
     }
 }
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup - Task Board</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: sans-serif;
+            background: linear-gradient(to bottom, #e8e4f3, #f5f3ff);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .form-container {
+            background: white;
+            padding: 40px 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 400px;
+        }
+
+        .form-container h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #764BA2;
+        }
+
+        .form-container input {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .form-container button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #764BA2;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .form-container button:hover {
+            background: #5d3a7f;
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .form-footer a {
+            color: #764BA2;
+            text-decoration: none;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #c3e6cb;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Sign Up</h2>
+        
+        <?php if (!empty($error)): ?>
+            <div class="error"><?php echo $error; ?></div>
+        <?php endif; ?>
+        
+        <?php if (!empty($success)): ?>
+            <div class="success"><?php echo $success; ?></div>
+        <?php endif; ?>
+        
+        <form method="POST" action="" onsubmit="return validateForm()">
+            <input type="text" name="fullname" placeholder="Full Name (letters only)" required 
+                   pattern="[A-Za-z\s]+" 
+                   title="Please enter only letters and spaces">
+            <div class="error-message" id="nameError">Username should not contain numbers</div>
+            
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password (min. 6 characters)" required minlength="6">
+            <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+            <button type="submit" name="signup">Sign Up</button>
+        </form>
+        <div class="form-footer">
+            Already have an account? <a href="login.php">Login</a>
+        </div>
+    </div>
+
+    <script>
+        function validateForm() {
+            const fullnameInput = document.querySelector('input[name="fullname"]');
+            const nameError = document.getElementById('nameError');
+            const numbers = /[0-9]/;
+            
+            if (numbers.test(fullnameInput.value)) {
+                nameError.style.display = 'block';
+                fullnameInput.style.borderColor = 'red';
+                return false;
+            } else {
+                nameError.style.display = 'none';
+                fullnameInput.style.borderColor = '#ccc';
+                return true;
+            }
+        }
+
+        // Real-time validation as user types
+        document.querySelector('input[name="fullname"]').addEventListener('input', function() {
+            const nameError = document.getElementById('nameError');
+            const numbers = /[0-9]/;
+            
+            if (numbers.test(this.value)) {
+                nameError.style.display = 'block';
+                this.style.borderColor = 'red';
+            } else {
+                nameError.style.display = 'none';
+                this.style.borderColor = '#ccc';
+            }
+        });
+    </script>
+</body>
+</html>

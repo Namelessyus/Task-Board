@@ -1,22 +1,16 @@
 <?php
+// includes/session_check.php
 session_start();
 
 // Check if user is logged in
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+if (!isset($_SESSION['userid']) || !isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     // Redirect to login page
     header("Location: login.php");
     exit();
 }
 
-// Optional: Check session age (e.g., 24 hours max)
-$max_session_age = 24 * 60 * 60; // 24 hours in seconds
-if (isset($_SESSION['login_time']) && (time() - $_SESSION['login_time'] > $max_session_age)) {
-    // Session expired, logout user
-    session_destroy();
-    header("Location: login.php");
-    exit();
-}
-
-// Update session time on each request (optional)
-$_SESSION['last_activity'] = time();
+// Set cache control headers for all protected pages
+header("Cache-Control: no-cache, no-store, must-revalidate"); // HTTP 1.1
+header("Pragma: no-cache"); // HTTP 1.0
+header("Expires: 0"); // Proxies
 ?>

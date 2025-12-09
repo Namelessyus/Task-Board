@@ -252,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <div class="join-code-example">
                 <h4>What is a join code?</h4>
-                <p>A join code is a 6-character code (like <span class="code">ABC123</span>) that the project creator shares with team members.</p>
+                <p>A join code is a 6-character code like <u>ABC123</u> that the project creator shares with team members.</p>
                 <p>Ask your project lead for the join code to join their project.</p>
             </div>
             

@@ -2,14 +2,14 @@
 session_start();
 include('connect.php');
 
-// Check if user is already logged in
+// Check if user is already logged in - FIXED: Also checks loggedin session
 if (isset($_SESSION['userid']) && isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
-    // User is already logged in, redirect to dashboard
     header("Location: dashboard.php");
     exit();
 }
 
 $error = "";
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password'];
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         if ($result && mysqli_num_rows($result) > 0) {
             $row = mysqli_fetch_assoc($result);
 
-            // Check if account is soft-deleted
+            // Check if account is soft-deleted 
             if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
                 $error = "This account has been deactivated. <a href='recover_account.php' style='color: #e53e3e;'>Click here to recover it</a> within 30 days.";
             } else if (password_verify($password, $row['password'])) {
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                 $_SESSION['username'] = $row['username'];
                 $_SESSION['userid'] = $row['id'];
                 $_SESSION['email'] = $row['email'];
-                $_SESSION['loggedin'] = true;
+                $_SESSION['loggedin'] = true; 
                 $_SESSION['login_time'] = time();
                 
                 // Redirect to dashboard
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         .form-container h2 {
             text-align: center;
             margin-bottom: 30px;
-            color: #6366f1;
+            color: #764BA2;
         }
 
         .form-container input {
@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             margin-top: 15px;
             border: none;
             border-radius: 8px;
-            background: #6366f1;
+            background: #764BA2;
             color: white;
             font-size: 16px;
             cursor: pointer;
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         }
 
         .form-container button:hover {
-            background: #4f46e5;
+            background: #5d3a7f;
         }
 
         .form-footer {
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         }
 
         .form-footer a {
-            color: #6366f1;
+            color: #764BA2;
             text-decoration: none;
         }
 
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         }
 
         .link {
-            color: #667eea;
+            color: #764BA2;
             text-decoration: none;
             font-size: 14px;
             padding: 8px 0;
@@ -200,8 +200,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             </a>
         </div>
         
+        <!-- FIXED: Changed signup.html to signup.php -->
         <div class="form-footer">
-            Don't have an account? <a href="signup.html">Sign Up</a>
+            Don't have an account? <a href="signup.php">Sign Up</a>
         </div>
     </div>
 </body>
