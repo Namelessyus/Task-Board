@@ -9,7 +9,7 @@ if (!isset($_SESSION['userid'])) {
 
 $user_id = $_SESSION['userid'];
 $username = $_SESSION['username'];
-$email = $_SESSION['email'];
+$email = $_SESSION['email'] ?? '';
 $success = "";
 $error = "";
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'profile';
