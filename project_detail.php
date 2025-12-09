@@ -360,7 +360,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             transition: width 0.3s ease;
         }
 
@@ -392,7 +392,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #764BA2;
             color: white;
         }
 
@@ -455,7 +455,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         }
 
         .form-input:focus {
-            border-color: #667eea;
+            border-color: #764BA2;;
             outline: none;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
@@ -473,7 +473,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         }
 
         .multiple-select option:hover {
-            background-color: #667eea;
+            background-color: #764BA2;;
             color: white;
         }
 
@@ -511,7 +511,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         }
 
         .member-role {
-            background: #667eea;
+            background: #764BA2;
             color: white;
             padding: 4px 8px;
             border-radius: 12px;
@@ -567,13 +567,13 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         }
 
         .manage-card:hover {
-            border-color: #667eea;
+            border-color: #764BA2;;
             background: #edf2f7;
         }
 
         .manage-icon {
             font-size: 2rem;
-            color: #667eea;
+            color: #764BA2;;
             margin-bottom: 10px;
         }
         
@@ -1264,7 +1264,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                                         </span>
                                     <?php endif; ?>
                                     <?php if ($task['assigned_usernames']): ?>
-                                        <span style="color: #667eea; font-size: 12px;">
+                                        <span style="color: #764BA2;; font-size: 12px;">
                                             (Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?>)
                                         </span>
                                     <?php endif; ?>
@@ -1281,7 +1281,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                                     if ($task['status'] == 'completed') echo '#10b981';
                                     elseif ($task['status'] == 'in_progress') echo '#f59e0b';
                                     elseif ($task['status'] == 'halted') echo '#ed8936';
-                                    else echo '#667eea';
+                                    else echo '#764BA2;';
                                     ?>">
                                     <?php echo ucfirst(str_replace('_', ' ', $task['status'])); ?>
                                 </span>
@@ -1400,7 +1400,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                                         </span>
                                     <?php endif; ?>
                                     <?php if ($task['assigned_usernames']): ?>
-                                        <span style="color: #667eea; font-size: 12px;">
+                                        <span style="color: #764BA2;; font-size: 12px;">
                                             (Assigned to: <?php echo htmlspecialchars($task['assigned_usernames']); ?>)
                                         </span>
                                     <?php endif; ?>
@@ -1584,7 +1584,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             // Add visual feedback for selected options
             Array.from(selectElement.options).forEach(option => {
                 if (option.selected) {
-                    option.style.backgroundColor = '#667eea';
+                    option.style.backgroundColor = '#764BA2;';
                     option.style.color = 'white';
                 } else {
                     option.style.backgroundColor = '';

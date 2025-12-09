@@ -2,8 +2,14 @@
 session_start();
 include('connect.php');
 
-$error = "";
+// Check if user is already logged in
+if (isset($_SESSION['userid']) && isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
+    // User is already logged in, redirect to dashboard
+    header("Location: dashboard.php");
+    exit();
+}
 
+$error = "";
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password'];

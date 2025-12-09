@@ -13,7 +13,7 @@ body {
 
 /* Header Nav */
 .header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #764BA2;
     color: white;
     padding: 12px 24px;
     display: flex;
@@ -178,7 +178,7 @@ body {
 .project-list a:hover {
     background: #f7fafc;
     color: #2d3748;
-    border-left-color: #667eea;
+    border-left-color: #5d3a7f;
     text-decoration: none;
 }
 
@@ -217,7 +217,7 @@ body {
 }
 
 .participant-badge {
-    background: #667eea;
+    background: #764BA2;
     color: white;
     padding: 4px 8px;
     border-radius: 12px;
@@ -246,12 +246,12 @@ body {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: #764BA2;;
     color: white;
 }
 
 .btn-primary:hover {
-    background: #5a67d8;
+    background: #5d3a7f;
 }
 
 .btn-warning {
@@ -289,7 +289,7 @@ body {
 }
 
 .search-container input:focus {
-    border-color: #667eea;
+    border-color: #5d3a7f;
     outline: none;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
@@ -398,7 +398,7 @@ body {
 .task-card:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     transform: translateY(-2px);
-    border-color: #667eea;
+    border-color: #764BA2;;
 }
 
 .task-title {
@@ -497,14 +497,14 @@ body {
 }
 
 .add-task-btn:hover {
-    border-color: #667eea;
-    color: #667eea;
+    border-color: #764BA2;;
+    color: #764BA2;;
     background: #f7fafc;
 }
 
 /* View Project Button */
 .view-project-btn {
-    background: #667eea;
+    background: #764BA2;
     color: white;
     padding: 8px 16px;
     border: none;
@@ -517,7 +517,7 @@ body {
 }
 
 .view-project-btn:hover {
-    background: #5a67d8;
+    background: #764BA2;
     text-decoration: none;
     color: white;
     transform: translateY(-1px);
@@ -554,7 +554,7 @@ body {
 }
 
 .form-input:focus {
-    border-color: #667eea;
+    border-color: #764BA2;
     outline: none;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
@@ -616,12 +616,12 @@ body {
 }
 
 .btn-create {
-    background: #667eea;
-    color: white;
+    background: #764BA2;
+     color: white;
 }
 
 .btn-create:hover {
-    background: #5a67d8;
+    background: #5d3a7f;
     text-decoration: none;
     color: white;
 }

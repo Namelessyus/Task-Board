@@ -1,6 +1,6 @@
         /*Nav Bar*/
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             padding: 12px 24px;
             display: flex;
@@ -164,27 +164,27 @@
         }
 
         .btn-primary {
-            background: #667EEA;
+            background: #764BA2;
             color: white;
             padding: 12px 32px;
             font-size: 16px;
         }
 
         .btn-primary:hover {
-            background: #4f46e5;
+            background: #5e3983;
         }
 
         .btn-secondary {
             background: white;
-            color: #667EEA;
+            color: #764BA2;
             padding: 12px 32px;
             font-size: 16px;
-            border: 2px solid #6366f1;
+            border: 2px solid #764BA2;;
         }
 
         .btn-secondary:hover {
             background: #e2e2e2;
-            color: #6366f1;
+            color: #764BA2;
         }
 
 
@@ -258,7 +258,7 @@
             align-items: center;
             justify-content: center;
             margin: 0 auto 1.5rem;
-            background: #667eea; 
+            background: #764BA2; 
             color: white;
             box-shadow: 0 8px 32px rgba(162, 176, 255, 0.3);
         }
@@ -557,7 +557,7 @@
         
         /* Footer */
         .footer {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             padding: 40px 0;
             margin-top: auto;

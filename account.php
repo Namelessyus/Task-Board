@@ -143,7 +143,7 @@ $stats = mysqli_fetch_assoc($stats_result);
 
         /* Header - Match your existing style */
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             padding: 12px 24px;
             display: flex;
@@ -263,7 +263,7 @@ $stats = mysqli_fetch_assoc($stats_result);
             min-width: 90px;
             height: 90px;
             border-radius: 1000px !important;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -327,7 +327,7 @@ $stats = mysqli_fetch_assoc($stats_result);
         }
         
         .tab-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
         }
@@ -386,14 +386,14 @@ $stats = mysqli_fetch_assoc($stats_result);
         }
         
         .form-control:focus {
-            border-color: #667eea;
+            border-color: #764BA2;
             outline: none;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
             background: white;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             padding: 14px 28px;
             border: none;
@@ -431,7 +431,7 @@ $stats = mysqli_fetch_assoc($stats_result);
         .stat-number {
             font-size: 42px;
             font-weight: 800;
-            color: #667eea;
+            color: #764BA2;
             display: block;
             margin-bottom: 8px;
             line-height: 1;
@@ -503,7 +503,7 @@ $stats = mysqli_fetch_assoc($stats_result);
         }
         
         .password-toggle .toggle-btn:hover {
-            color: #667eea;
+            color: #764BA2;
         }
         
         .section-title {
@@ -517,7 +517,7 @@ $stats = mysqli_fetch_assoc($stats_result);
         }
         
         .section-title i {
-            color: #667eea;
+            color: #764BA2;
         }
         
         .section-subtitle {
@@ -556,7 +556,7 @@ $stats = mysqli_fetch_assoc($stats_result);
             border-radius: 12px;
             background: #f8fafc;
             margin-bottom: 12px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #764BA2;
             transition: all 0.3s;
         }
         
@@ -570,7 +570,7 @@ $stats = mysqli_fetch_assoc($stats_result);
             height: 50px;
             min-width: 50px;
             border-radius: 1000px !important;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -918,7 +918,7 @@ $stats = mysqli_fetch_assoc($stats_result);
                         } else {
                             foreach ($achievements as $achievement) {
                                 echo '<div style="display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #e2e8f0;">';
-                                echo '<i class="fas ' . $achievement['icon'] . '" style="color: #667eea; font-size: 20px;"></i>';
+                                echo '<i class="fas ' . $achievement['icon'] . '" style="color: #764BA2; font-size: 20px;"></i>';
                                 echo '<div>';
                                 echo '<strong>' . $achievement['title'] . '</strong>';
                                 echo '<p style="color: #718096; margin: 0; font-size: 14px;">' . $achievement['description'] . '</p>';

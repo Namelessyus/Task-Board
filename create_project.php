@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             color: white;
             padding: 12px 24px;
             display: flex;
@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         input:focus, textarea:focus, select:focus {
-            border-color: #667eea;
+            border-color: #764BA2;;
             outline: none;
         }
 
@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         button {
             width: 100%;
             padding: 12px;
-            background: #667eea;
+            background: #764BA2;
             color: white;
             border: none;
             border-radius: 5px;
@@ -187,13 +187,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         button:hover {
-            background: #5a6fd8;
+            background: #5d3a7f;;
         }
 
         .back-link {
             display: inline-block;
             margin-top: 20px;
-            color: #667eea;
+            color: #764BA2;;
             text-decoration: none;
             font-weight: 500;
             text-align: center;

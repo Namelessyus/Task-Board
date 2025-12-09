@@ -83,7 +83,7 @@ if (isset($_SESSION['success'])) {
 
         .class-header {
             height: 100px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #764BA2;
             position: relative;
             padding: 20px;
             color: white;
@@ -125,7 +125,7 @@ if (isset($_SESSION['success'])) {
         }
 
         .class-role.participant {
-            background: #667eea;
+            background: #764BA2;
         }
 
         .class-code {
@@ -185,12 +185,12 @@ if (isset($_SESSION['success'])) {
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #764BA2;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #5a67d8;
+            background: #5d3a7f;
             text-decoration: none;
             color: white;
         }
@@ -245,7 +245,7 @@ if (isset($_SESSION['success'])) {
         }
 
         .create-first-btn {
-            background: #667eea;
+            background: #764BA2;
             color: white;
             padding: 12px 30px;
             border: none;
@@ -261,7 +261,7 @@ if (isset($_SESSION['success'])) {
         }
 
         .create-first-btn:hover {
-            background: #5a67d8;
+            background: #5d3a7f;
             text-decoration: none;
             color: white;
             transform: translateY(-2px);
