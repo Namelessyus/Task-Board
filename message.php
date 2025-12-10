@@ -18,15 +18,6 @@ try {
 
     // //Recipients
     $mail->setFrom('schoolusecfa@gmail.com', 'TaskBoard');
-    $mail->addAddress('rabinamaharjan392@gmail.com'); // reciever email
-
-    // //Content
-    $mail->isHTML(true);
-    $mail->Subject = 'Hello from XAMPP + Gmail';
-    $mail->Body    = 'This is a test email sent using <b>PHPMailer</b> from XAMPP.';
-
-    $mail->send();
-    echo 'Email Sent Successfully!';
 } catch (Exception $e) {
     echo "Error: {$mail->ErrorInfo}";
 }
