@@ -1,1 +1,7 @@
-**/.vscode/**
+vendor/
+/vendor/*
+composer.lock
+composer.json
+
+.vscode/
+/.vscode/*

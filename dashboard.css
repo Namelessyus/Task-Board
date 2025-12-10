@@ -182,9 +182,8 @@ body {
     text-decoration: none;
 }
 
-/* FIX FOR LONG PROJECT TITLES - UPDATED WITH CHARACTER LIMIT */
 .project-list a {
-    min-width: 0; /* This is crucial for text truncation in flexbox */
+    min-width: 0;
 }
 
 .project-title-text {
@@ -192,8 +191,8 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0; /* Important for flexbox truncation */
-    max-width: 180px; /* Limits to about 18 characters */
+    min-width: 0; 
+    max-width: 180px; 
     font-size: 14px;
 }
 
@@ -204,7 +203,7 @@ body {
     font-size: 14px;
 }
 
-/* Badge Styles - UPDATED */
+/* Badge Styles */
 .supervisor-badge {
     background: #f59e0b;
     color: white;

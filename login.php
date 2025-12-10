@@ -29,7 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             if (isset($row['is_deleted']) && $row['is_deleted'] == 1) {
                 $error = "This account has been deactivated. <a href='recover_account.php' style='color: #e53e3e;'>Click here to recover it</a> within 30 days.";
             } else if (password_verify($password, $row['password'])) {
-                // Regenerate session ID to prevent session fixation
+                if($row['is_verified']){
+                                    // Regenerate session ID to prevent session fixation
                 session_regenerate_id(true);
                 
                 $_SESSION['username'] = $row['username'];
@@ -40,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                 
                 // Redirect to dashboard
                 header("Location: dashboard.php");
+                exit();
+                }
+                header("Location: resend_verification.php");
                 exit();
             } else {
                 $error = "Incorrect password. Please try again.";
