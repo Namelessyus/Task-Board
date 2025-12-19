@@ -132,7 +132,7 @@ if (isset($_SESSION['success'])) {
         }
 
         .class-role.participant {
-            background: #764BA2;
+            background: #667eea;
         }
 
         .class-code {
@@ -295,6 +295,7 @@ if (isset($_SESSION['success'])) {
     <a href="dashboard.php" class="active">Home</a>
     <a href="create_project.php">Create Project</a>
     <a href="join_project.php">Join Project</a>
+    <a href="calendar.php">Calendar</a>
     <a href="account.php">Account</a>
 </nav>
         <a href="logout.php" class="logout-btn">Logout</a>

@@ -71,25 +71,73 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             flex-direction: column;
         }
 
-        .header {
-            background: #764BA2;
-            color: white;
-            padding: 12px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+        /* Header Nav */
+.header {
+    background: #764BA2;
+    color: white;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
 
-        .logo a {
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 600;
-        }
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.logo a {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.nav {
+    display: flex;
+    gap: 32px;
+}
+
+.nav a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 0;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.3s;
+}
+
+.nav a:hover, .nav a.active {
+    border-bottom-color: white;
+}
+
+/* Logout Button */
+.logout-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.logout-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
 
         .main-content {
             flex: 1;
@@ -218,12 +266,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </style>
 </head>
 <body>
-    <!-- Header -->
+      <!-- Header -->
     <header class="header">
         <div class="logo">
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
+        <nav class="nav">
+    <a href="dashboard.php">Home</a>
+    <a href="create_project.php">Create Project</a>
+    <a href="join_project.php" class="active">Join Project</a>
+    <a href="calendar.php">Calendar</a>
+    <a href="account.php">Account</a>
+</nav>
+        <a href="logout.php" class="logout-btn">Logout</a>
     </header>
+
 
     <!-- Main Content -->
     <div class="main-content">

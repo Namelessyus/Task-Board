@@ -12,7 +12,7 @@ try {
     $mail->Host       = 'smtp.gmail.com';
     $mail->SMTPAuth   = true;
     $mail->Username   = 'schoolusecfa@gmail.com';     // Gmail
-    $mail->Password   = '';       // App Password (16 chars)
+    $mail->Password   = 'bivbpdzbiulhzvyz';       // App Password (16 chars)
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port       = 587;
 

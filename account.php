@@ -697,11 +697,12 @@ $stats = mysqli_fetch_assoc($stats_result);
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-            <a href="dashboard.php">Home</a>
-            <a href="create_project.php">Create Project</a>
-            <a href="join_project.php">Join Project</a>
-            <a href="account.php" class="active">Account</a>
-        </nav>
+    <a href="dashboard.php">Home</a>
+    <a href="create_project.php">Create Project</a>
+    <a href="join_project.php">Join Project</a>
+    <a href="calendar.php">Calendar</a>
+    <a href="account.php" class="active">Account</a>
+</nav>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
