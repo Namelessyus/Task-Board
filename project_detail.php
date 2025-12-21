@@ -200,6 +200,69 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_task']) && $is_
     }
 }
 
+// Handle member removal (only for supervisors)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['remove_member']) && $is_supervisor) {
+    $member_user_id = intval($_POST['member_user_id']);
+    
+    // Double check if user is the supervisor and not trying to remove themselves
+    if ($project['supervisor_id'] == $user_id && $member_user_id != $user_id) {
+        // Check if member exists in this project
+        $check_sql = "SELECT * FROM project_members 
+                      WHERE user_id = '$member_user_id' 
+                      AND project_id = '$project_id'";
+        $check_result = mysqli_query($conn, $check_sql);
+        
+        if (mysqli_num_rows($check_result) > 0) {
+            // Start transaction for safe operations
+            mysqli_begin_transaction($conn);
+            
+            try {
+                // 1. Remove the member from project_members
+                $remove_sql = "DELETE FROM project_members 
+                               WHERE user_id = '$member_user_id' 
+                               AND project_id = '$project_id'";
+                
+                if (!mysqli_query($conn, $remove_sql)) {
+                    throw new Exception("Error removing member: " . mysqli_error($conn));
+                }
+                
+                // 2. Remove any task assignments for this user in this project
+                $remove_assignments_sql = "DELETE ta FROM task_assignments ta
+                                           JOIN tasks t ON ta.task_id = t.id
+                                           WHERE ta.user_id = '$member_user_id'
+                                           AND t.project_id = '$project_id'";
+                
+                mysqli_query($conn, $remove_assignments_sql);
+                
+                // 3. Update any tasks assigned solely to this user to have NULL assigned_to
+                $update_tasks_sql = "UPDATE tasks 
+                                     SET assigned_to = NULL 
+                                     WHERE project_id = '$project_id' 
+                                     AND assigned_to = '$member_user_id'";
+                
+                mysqli_query($conn, $update_tasks_sql);
+                
+                // Commit the transaction
+                mysqli_commit($conn);
+                
+                $success = "Member removed successfully!";
+                // Refresh the page
+                header("Location: project_detail.php?id=$project_id&manage=true#teamManagement");
+                exit();
+                
+            } catch (Exception $e) {
+                // Rollback transaction on error
+                mysqli_rollback($conn);
+                $error = "Error: " . $e->getMessage();
+            }
+        } else {
+            $error = "Member not found in this project.";
+        }
+    } else {
+        $error = "You cannot remove yourself as supervisor.";
+    }
+}
+
 // Handle project deletion (only for supervisors) - SOFT DELETE
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $is_supervisor) {
     // Double check if user is the supervisor
@@ -224,17 +287,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $
     }
 }
 
-// Get ALL project members INCLUDING SUPERVISOR for task assignment
-$members_sql = "SELECT u.id, u.username, 
+// Get ALL project members INCLUDING SUPERVISOR for task assignment AND management
+$members_sql = "SELECT u.id as user_id, u.username, 
                 CASE 
                     WHEN u.id = '" . $project['supervisor_id'] . "' THEN 'supervisor'
-                    ELSE COALESCE(pm.role, 'supervisor') 
-                END as role
+                    ELSE COALESCE(pm.role, 'general') 
+                END as role,
+                pm.id as member_id
                 FROM users u
                 LEFT JOIN project_members pm ON u.id = pm.user_id AND pm.project_id = '$project_id'
                 WHERE u.id = '" . $project['supervisor_id'] . "' 
                 OR pm.project_id = '$project_id'
-                GROUP BY u.id
                 ORDER BY 
                     CASE 
                         WHEN u.id = '" . $project['supervisor_id'] . "' THEN 1
@@ -822,6 +885,41 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             z-index: 1;
         }
         
+        /* Team Management Styles */
+        #teamManagement .member-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        #teamManagement .member-item:hover {
+            background: #f7fafc;
+            transform: translateX(5px);
+        }
+
+        #teamManagement .member-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Search input styling */
+        #memberSearch {
+            transition: all 0.3s;
+            border: 2px solid #e2e8f0;
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        #memberSearch:focus {
+            border-color: #764BA2;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+        }
+
         /* For mobile responsiveness */
         @media (max-width: 768px) {
             .project-title {
@@ -842,6 +940,16 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             
             .halted-tasks-container {
                 grid-template-columns: 1fr;
+            }
+            
+            #teamManagement .member-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            #teamManagement .member-item > div:last-child {
+                align-self: flex-end;
             }
         }
     </style>
@@ -1310,7 +1418,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                         </div>
 
                         <!-- Manage Members Card -->
-                        <div class="manage-card">
+                        <div class="manage-card" onclick="document.getElementById('teamManagement').scrollIntoView({behavior: 'smooth'})">
                             <div class="manage-icon">
                                 <i class="fas fa-user-cog"></i>
                             </div>
@@ -1353,7 +1461,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                                 <label for="assignees">Assign to team members (optional - hold CTRL/CMD to select multiple):</label>
                                 <select name="assignees[]" class="form-input multiple-select" id="assignees" multiple>
                                     <?php foreach ($project_members as $member): ?>
-                                        <option value="<?php echo $member['id']; ?>">
+                                        <option value="<?php echo $member['user_id']; ?>">
                                             <?php echo htmlspecialchars($member['username']); ?> 
                                             (<?php echo ucfirst($member['role']); ?>)
                                         </option>
@@ -1377,6 +1485,115 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                             <i class="fas fa-plus"></i> Create Task
                         </button>
                     </form>
+                </div>
+                
+                <!-- Team Management Section -->
+                <div class="members-list" id="teamManagement">
+                    <h3><i class="fas fa-user-cog"></i> Manage Team Members</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #718096;">Current project members. You can remove participants from the project.</p>
+                        <span class="task-count"><?php echo count($project_members); ?> members</span>
+                    </div>
+                    
+                    <!-- Search functionality for large teams -->
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="memberSearch" class="form-input" placeholder="Search team members..." 
+                               style="padding: 10px 12px; font-size: 14px;" onkeyup="filterMembers()">
+                    </div>
+                    
+                    <div id="membersListContainer">
+                        <?php foreach ($project_members as $member): ?>
+                            <div class="member-item" data-username="<?php echo strtolower(htmlspecialchars($member['username'])); ?>">
+                                <div class="member-info">
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <div style="width: 36px; height: 36px; background: <?php echo $member['role'] == 'supervisor' ? '#f59e0b' : '#764BA2'; ?>; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: #2d3748;"><?php echo htmlspecialchars($member['username']); ?></div>
+                                            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+                                                <span class="member-role <?php echo $member['role'] == 'supervisor' ? 'supervisor-badge' : ''; ?>">
+                                                    <i class="fas <?php echo $member['role'] == 'supervisor' ? 'fa-crown' : 'fa-user'; ?>"></i>
+                                                    <?php echo ucfirst($member['role']); ?>
+                                                </span>
+                                                <?php if ($member['role'] != 'supervisor'): ?>
+                                                    <?php 
+                                                    // Count tasks assigned to this member
+                                                    $task_count_sql = "SELECT COUNT(*) as task_count 
+                                                                      FROM task_assignments ta
+                                                                      JOIN tasks t ON ta.task_id = t.id
+                                                                      WHERE ta.user_id = '{$member['user_id']}'
+                                                                      AND t.project_id = '$project_id'
+                                                                      AND t.is_deleted = 0";
+                                                    $task_count_result = mysqli_query($conn, $task_count_sql);
+                                                    $task_count = mysqli_fetch_assoc($task_count_result)['task_count'];
+                                                    ?>
+                                                    <span style="font-size: 12px; color: #718096;">
+                                                        <i class="fas fa-tasks"></i> <?php echo $task_count; ?> tasks
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <?php if ($member['user_id'] != $project['supervisor_id']): ?>
+                                        <button type="button" onclick="showRemoveMemberModal(
+                                            <?php echo $member['user_id']; ?>, 
+                                            '<?php echo htmlspecialchars(addslashes($member['username'])); ?>',
+                                            <?php echo $task_count; ?>
+                                        )" class="btn-manage btn-danger" style="padding: 8px 16px; font-size: 13px;">
+                                            <i class="fas fa-user-times"></i> Remove
+                                        </button>
+                                    <?php else: ?>
+                                        <span style="color: #f59e0b; font-size: 14px; font-weight: 600;">
+                                            Project Supervisor
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <?php if (empty($project_members)): ?>
+                            <div class="no-tasks" style="text-align: center; padding: 40px 20px;">
+                                <i class="fas fa-users" style="font-size: 48px; color: #cbd5e0; margin-bottom: 15px;"></i>
+                                <h4 style="color: #4a5568; margin-bottom: 10px;">No Team Members</h4>
+                                <p style="color: #718096;">You are the only member of this project.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div style="margin-top: 25px; padding: 20px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        
+                        
+                        <div style="display: flex; gap: 15px; margin-top: 15px;">
+                            <div style="flex: 1; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 24px; font-weight: 700; color: #764BA2; text-align: center;">
+                                    <?php echo count($project_members); ?>
+                                </div>
+                                <div style="text-align: center; font-size: 14px; color: #718096; margin-top: 5px;">
+                                    Total Members
+                                </div>
+                            </div>
+                            <div style="flex: 1; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 24px; font-weight: 700; color: #f59e0b; text-align: center;">
+                                    1
+                                </div>
+                                <div style="text-align: center; font-size: 14px; color: #718096; margin-top: 5px;">
+                                    Supervisor
+                                </div>
+                            </div>
+                            <div style="flex: 1; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 24px; font-weight: 700; color: #667eea; text-align: center;">
+                                    <?php echo max(0, count($project_members) - 1); ?>
+                                </div>
+                                <div style="text-align: center; font-size: 14px; color: #718096; margin-top: 5px;">
+                                    Participants
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Task List for Management -->
@@ -1488,6 +1705,43 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         </div>
     </div>
 
+    <!-- Remove Member Modal -->
+    <div id="removeMemberModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; text-align: center;">
+            <div style="font-size: 3rem; color: #e53e3e; margin-bottom: 15px;">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <h3 style="color: #2d3748; margin-bottom: 15px;">Remove Team Member</h3>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <p id="removeMemberText" style="color: #718096; margin-bottom: 15px;"></p>
+                
+                <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="color: #c53030; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle"></i> What will happen:
+                    </h4>
+                    <ul style="color: #718096; font-size: 14px; padding-left: 20px; margin: 0;">
+                        <li>Member will lose access to this project</li>
+                        <li>They will be removed from all assigned tasks</li>
+                        <li>Their progress notes will remain in the database</li>
+                        <li>They can rejoin using the project join code</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button onclick="hideRemoveMemberModal()" style="padding: 10px 20px; border: 1px solid #cbd5e0; background: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500; flex: 1;">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <form method="POST" action="" id="removeMemberForm" style="flex: 1;">
+                    <input type="hidden" name="member_user_id" id="removeMemberUserId">
+                    <button type="submit" name="remove_member" style="padding: 10px 20px; background: #e53e3e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; width: 100%;">
+                        <i class="fas fa-user-times"></i> Remove Member
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Smooth scrolling for navigation
         document.querySelectorAll('.project-list a').forEach(anchor => {
@@ -1518,6 +1772,24 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
 
         function hideHaltModal() {
             document.getElementById('haltModal').style.display = 'none';
+        }
+
+        // Remove member functions
+        function showRemoveMemberModal(userId, username, taskCount) {
+            document.getElementById('removeMemberUserId').value = userId;
+            
+            let message = `Are you sure you want to remove <strong>${username}</strong> from this project?`;
+            
+            if (taskCount > 0) {
+                message += `<br><br>This member is currently assigned to <strong>${taskCount} task(s)</strong>. They will be automatically unassigned from all tasks.`;
+            }
+            
+            document.getElementById('removeMemberText').innerHTML = message;
+            document.getElementById('removeMemberModal').style.display = 'flex';
+        }
+
+        function hideRemoveMemberModal() {
+            document.getElementById('removeMemberModal').style.display = 'none';
         }
 
         // Toggle halted section
@@ -1559,6 +1831,12 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             }
         });
         
+        document.getElementById('removeMemberModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideRemoveMemberModal();
+            }
+        });
+        
         // Task form validation
         function validateTaskForm() {
             const taskDueDateInput = document.getElementById('task_due_date');
@@ -1589,6 +1867,21 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                 } else {
                     option.style.backgroundColor = '';
                     option.style.color = '';
+                }
+            });
+        }
+        
+        // Filter team members by search
+        function filterMembers() {
+            const searchTerm = document.getElementById('memberSearch').value.toLowerCase();
+            const memberItems = document.querySelectorAll('#membersListContainer .member-item');
+            
+            memberItems.forEach(item => {
+                const username = item.getAttribute('data-username');
+                if (username.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
                 }
             });
         }
