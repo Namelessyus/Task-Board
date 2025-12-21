@@ -17,6 +17,11 @@ include('connect.php');
 $username = $_SESSION['username'];
 $userid = $_SESSION['userid'];
 
+// Get search and filter values
+$search_query = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
+$filter_role = isset($_GET['filter']) ? $_GET['filter'] : 'all'; // all, supervisor, participant
+$filter_sort = isset($_GET['sort']) ? $_GET['sort'] : 'recent'; // recent, name, progress
+
 // Get user's projects (created and joined) - excluding soft-deleted
 $my_projects = [];
 $joined_projects = [];
@@ -25,9 +30,24 @@ $joined_projects = [];
 $created_sql = "SELECT p.*, COUNT(pm.user_id) as member_count 
                 FROM projects p 
                 LEFT JOIN project_members pm ON p.id = pm.project_id 
-                WHERE p.supervisor_id = '$userid' AND p.is_deleted = 0
-                GROUP BY p.id 
-                ORDER BY p.created_at DESC";
+                WHERE p.supervisor_id = '$userid' AND p.is_deleted = 0";
+
+// Add search filter for created projects
+if (!empty($search_query)) {
+    $created_sql .= " AND (p.title LIKE '%$search_query%' OR p.description LIKE '%$search_query%')";
+}
+
+$created_sql .= " GROUP BY p.id ";
+
+// Add sorting
+if ($filter_sort === 'name') {
+    $created_sql .= " ORDER BY p.title ASC";
+} elseif ($filter_sort === 'progress') {
+    $created_sql .= " ORDER BY p.created_at DESC";
+} else {
+    $created_sql .= " ORDER BY p.created_at DESC";
+}
+
 $created_result = mysqli_query($conn, $created_sql);
 if ($created_result) {
     while ($row = mysqli_fetch_assoc($created_result)) {
@@ -39,8 +59,22 @@ if ($created_result) {
 $joined_sql = "SELECT p.*, pm.role as member_role 
                FROM projects p 
                JOIN project_members pm ON p.id = pm.project_id 
-               WHERE pm.user_id = '$userid' AND p.supervisor_id != '$userid' AND p.is_deleted = 0
-               ORDER BY p.created_at DESC";
+               WHERE pm.user_id = '$userid' AND p.supervisor_id != '$userid' AND p.is_deleted = 0";
+
+// Add search filter for joined projects
+if (!empty($search_query)) {
+    $joined_sql .= " AND (p.title LIKE '%$search_query%' OR p.description LIKE '%$search_query%')";
+}
+
+// Add sorting
+if ($filter_sort === 'name') {
+    $joined_sql .= " ORDER BY p.title ASC";
+} elseif ($filter_sort === 'progress') {
+    $joined_sql .= " ORDER BY p.created_at DESC";
+} else {
+    $joined_sql .= " ORDER BY p.created_at DESC";
+}
+
 $joined_result = mysqli_query($conn, $joined_sql);
 if ($joined_result) {
     while ($row = mysqli_fetch_assoc($joined_result)) {
@@ -48,8 +82,14 @@ if ($joined_result) {
     }
 }
 
-// Combine all projects for the main grid
-$all_projects = array_merge($my_projects, $joined_projects);
+// Combine projects based on filter
+if ($filter_role === 'supervisor') {
+    $all_projects = $my_projects;
+} elseif ($filter_role === 'participant') {
+    $all_projects = $joined_projects;
+} else {
+    $all_projects = array_merge($my_projects, $joined_projects);
+}
 
 // Check for success message from project deletion
 if (isset($_SESSION['success'])) {
@@ -283,6 +323,144 @@ if (isset($_SESSION['success'])) {
             border: 1px solid #c3e6cb;
             text-align: center;
         }
+
+        /* Search and Filter Bar */
+        .search-filter-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px 12px 45px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: #764BA2;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            background: white;
+            color: #4a5568;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .filter-btn:hover {
+            border-color: #764BA2;
+            color: #764BA2;
+        }
+
+        .filter-btn.active {
+            background: #764BA2;
+            border-color: #764BA2;
+            color: white;
+        }
+
+        .sort-select {
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            background: white;
+            color: #4a5568;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .sort-select:focus {
+            border-color: #764BA2;
+            outline: none;
+        }
+
+        .result-count {
+            color: #718096;
+            font-size: 14px;
+            margin-left: auto;
+        }
+
+        .clear-search {
+            background: #e2e8f0;
+            color: #4a5568;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 25px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .clear-search:hover {
+            background: #cbd5e0;
+            text-decoration: none;
+            color: #4a5568;
+        }
+
+        /* No results message */
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        .no-results h3 {
+            font-size: 24px;
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+
+        .no-results p {
+            color: #718096;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -292,17 +470,17 @@ if (isset($_SESSION['success'])) {
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-    <a href="dashboard.php" class="active">Home</a>
-    <a href="create_project.php">Create Project</a>
-    <a href="join_project.php">Join Project</a>
-    <a href="calendar.php">Calendar</a>
-    <a href="account.php">Account</a>
-</nav>
+            <a href="dashboard.php" class="active">Home</a>
+            <a href="create_project.php">Create Project</a>
+            <a href="join_project.php">Join Project</a>
+            <a href="calendar.php">Calendar</a>
+            <a href="account.php">Account</a>
+        </nav>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
     <!-- Dashboard Content -->
-   <div class="dashboard-container">
+    <div class="dashboard-container">
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-section">
@@ -372,7 +550,52 @@ if (isset($_SESSION['success'])) {
                     <?php echo $success_message; ?>
                 </div>
             <?php endif; ?>
- 
+
+            <!-- Search and Filter Bar -->
+            <div class="search-filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <form id="searchForm" method="GET" style="display: inline;">
+                        <input type="text" 
+                               name="search" 
+                               placeholder="Search projects..." 
+                               value="<?php echo htmlspecialchars($search_query); ?>"
+                               onkeyup="if(event.key === 'Enter') this.form.submit()">
+                        <input type="hidden" name="filter" value="<?php echo $filter_role; ?>">
+                        <input type="hidden" name="sort" value="<?php echo $filter_sort; ?>">
+                    </form>
+                </div>
+
+                <div class="filter-group">
+                    <button class="filter-btn <?php echo $filter_role === 'all' ? 'active' : ''; ?>" 
+                            onclick="setFilter('all')">
+                        <i class="fas fa-layer-group"></i> All Projects
+                    </button>
+                    <button class="filter-btn <?php echo $filter_role === 'supervisor' ? 'active' : ''; ?>" 
+                            onclick="setFilter('supervisor')">
+                        <i class="fas fa-crown"></i> Created by Me
+                    </button>
+                    <button class="filter-btn <?php echo $filter_role === 'participant' ? 'active' : ''; ?>" 
+                            onclick="setFilter('participant')">
+                        <i class="fas fa-users"></i> Joined Projects
+                    </button>
+                </div>
+
+                <select class="sort-select" onchange="setSort(this.value)">
+                    <option value="recent" <?php echo $filter_sort === 'recent' ? 'selected' : ''; ?>>Sort by: Most Recent</option>
+                    <option value="name" <?php echo $filter_sort === 'name' ? 'selected' : ''; ?>>Sort by: Name A-Z</option>
+                    <option value="progress" <?php echo $filter_sort === 'progress' ? 'selected' : ''; ?>>Sort by: Progress</option>
+                </select>
+
+                <?php if(!empty($search_query) || $filter_role !== 'all' || $filter_sort !== 'recent'): ?>
+                    <a href="dashboard.php" class="clear-search">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                <?php endif; ?>
+
+                
+            </div>
+
             <?php if(!empty($all_projects)): ?>
                 <div class="classroom-grid">
                     <?php foreach($all_projects as $project): 
@@ -446,368 +669,408 @@ if (isset($_SESSION['success'])) {
                     </div>
                 </div>
             <?php else: ?>
-                <!-- Empty State -->
-                <div class="empty-state">
-                    <i class="fas fa-tasks" style="font-size: 64px; color: #cbd5e0; margin-bottom: 20px;"></i>
-                    <h3>No Projects Yet</h3>
-                    <p>Create your first project or join an existing one to get started!</p>
-                    <div style="display: flex; gap: 15px; justify-content: center;">
-                        <a href="create_project.php" class="create-first-btn">
-                            <i class="fas fa-plus"></i> Create Project
-                        </a>
-                        <a href="join_project.php" class="create-first-btn" style="background: #48bb78;">
-                            <i class="fas fa-users"></i> Join Project
-                        </a>
+                <!-- No Results State -->
+                <?php if(!empty($search_query) || $filter_role !== 'all'): ?>
+                    <div class="no-results">
+                        <i class="fas fa-search" style="font-size: 64px; color: #cbd5e0; margin-bottom: 20px;"></i>
+                        <h3>No Projects Found</h3>
+                        <p>
+                            <?php 
+                            if (!empty($search_query)) {
+                                echo "No projects found for '<strong>" . htmlspecialchars($search_query) . "</strong>'";
+                                if ($filter_role !== 'all') {
+                                    echo " in " . ($filter_role === 'supervisor' ? "projects created by you" : "projects you joined");
+                                }
+                            } else {
+                                echo "No " . ($filter_role === 'supervisor' ? "projects created by you" : "projects you joined") . " found";
+                            }
+                            ?>
+                        </p>
+                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                            <a href="dashboard.php" class="create-first-btn" style="background: #667eea;">
+                                <i class="fas fa-undo"></i> Show All Projects
+                            </a>
+                            <a href="create_project.php" class="create-first-btn">
+                                <i class="fas fa-plus"></i> Create Project
+                            </a>
+                        </div>
                     </div>
-                </div>
+                <?php else: ?>
+                    <!-- Empty State -->
+                    <div class="empty-state">
+                        <i class="fas fa-tasks" style="font-size: 64px; color: #cbd5e0; margin-bottom: 20px;"></i>
+                        <h3>No Projects Yet</h3>
+                        <p>Create your first project or join an existing one to get started!</p>
+                        <div style="display: flex; gap: 15px; justify-content: center;">
+                            <a href="create_project.php" class="create-first-btn">
+                                <i class="fas fa-plus"></i> Create Project
+                            </a>
+                            <a href="join_project.php" class="create-first-btn" style="background: #48bb78;">
+                                <i class="fas fa-users"></i> Join Project
+                            </a>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
 
-    
     <script>
-function toggleDropdown(dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    const arrow = document.getElementById(dropdownId.replace('projects', 'arrow'));
-    
-    dropdown.classList.toggle('active');
-    arrow.style.transform = dropdown.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
-}
-
-// Initialize dropdowns as open by default
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('created-projects').classList.add('active');
-    document.getElementById('joined-projects').classList.add('active');
-    
-    // Add draggable functionality
-    makeProjectsDraggable();
-    
-    // Setup join code copying
-    setupJoinCodeCopying();
-});
-
-// Simple draggable functionality
-function makeProjectsDraggable() {
-    const grid = document.querySelector('.classroom-grid');
-    const cards = document.querySelectorAll('.class-card');
-    
-    cards.forEach(card => {
-        // Only make project cards draggable (not the "Create New Project" card)
-        const isProjectCard = card.querySelector('.class-header') && 
-                               card.querySelector('.class-title') && 
-                               card.querySelector('.class-body');
+    function toggleDropdown(dropdownId) {
+        const dropdown = document.getElementById(dropdownId);
+        const arrow = document.getElementById(dropdownId.replace('projects', 'arrow'));
         
-        if (isProjectCard) {
-            // Make card draggable
-            card.draggable = true;
-            card.style.cursor = 'move';
-            card.style.userSelect = 'none';
-            
-            // Drag events
-            card.addEventListener('dragstart', handleDragStart);
-            card.addEventListener('dragover', handleDragOver);
-            card.addEventListener('dragenter', handleDragEnter);
-            card.addEventListener('dragleave', handleDragLeave);
-            card.addEventListener('drop', handleDrop);
-            card.addEventListener('dragend', handleDragEnd);
-        } else {
-            // This is the "Create New Project" card - make it non-draggable
-            card.draggable = false;
-            card.style.cursor = 'default';
-        }
+        dropdown.classList.toggle('active');
+        arrow.style.transform = dropdown.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    // Initialize dropdowns as open by default
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('created-projects').classList.add('active');
+        document.getElementById('joined-projects').classList.add('active');
+        
+        // Add draggable functionality
+        makeProjectsDraggable();
+        
+        // Setup join code copying
+        setupJoinCodeCopying();
     });
-}
 
-// Setup click-to-copy for join codes
-function setupJoinCodeCopying() {
-    const joinCodes = document.querySelectorAll('.class-code');
-    
-    joinCodes.forEach(codeElement => {
-        // Store original text
-        const originalText = codeElement.textContent;
-        
-        // Add cursor pointer for visual indication
-        codeElement.style.cursor = 'pointer';
-        codeElement.title = 'Click to copy join code';
-        
-        // Add hover effect
-        codeElement.addEventListener('mouseenter', function() {
-            this.style.transform = 'scale(1.05)';
-            this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-        });
-        
-        codeElement.addEventListener('mouseleave', function() {
-            this.style.transform = 'scale(1)';
-            this.style.boxShadow = 'none';
-        });
-        
-        // Add click event listener
-        codeElement.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent card from being dragged
-            e.preventDefault(); // Prevent any default behavior
-            
-            // Store original styles
-            const originalBackground = this.style.background;
-            const originalColor = this.style.color;
-            
-            // Copy text to clipboard
-            navigator.clipboard.writeText(originalText).then(() => {
-                // Show feedback
-                this.textContent = 'Copied!';
-                this.style.background = '#48bb78';
-                this.style.color = 'white';
-                
-                // Reset after 1.5 seconds
-                setTimeout(() => {
-                    this.textContent = originalText;
-                    this.style.background = originalBackground;
-                    this.style.color = originalColor;
-                }, 1500);
-                
-                // Show notification
-                showNotification('Join code copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-                showNotification('Failed to copy code');
-            });
-        });
-        
-        // Prevent drag events on the join code element
-        codeElement.addEventListener('dragstart', function(e) {
-            e.stopPropagation(); // Prevent card drag from starting
-            e.preventDefault(); // Prevent default drag behavior
-        });
-        
-        // Allow text selection on join code
-        codeElement.style.userSelect = 'text';
-        codeElement.style.webkitUserSelect = 'text';
-        codeElement.style.mozUserSelect = 'text';
-        codeElement.style.msUserSelect = 'text';
-    });
-}
-
-let draggedCard = null;
-
-function handleDragStart(e) {
-    // Don't start drag if clicking on join code
-    if (e.target.classList.contains('class-code') || 
-        e.target.closest('.class-code')) {
-        e.preventDefault();
-        return;
+    // Filter functions
+    function setFilter(filter) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('filter', filter);
+        window.location.href = url.toString();
     }
-    
-    draggedCard = this;
-    this.style.opacity = '0.4';
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', this.innerHTML);
-}
 
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault(); // Necessary to allow dropping
+    function setSort(sort) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('sort', sort);
+        window.location.href = url.toString();
     }
-    e.dataTransfer.dropEffect = 'move';
-    return false;
-}
 
-function handleDragEnter(e) {
-    if (this !== draggedCard) {
-        this.classList.add('over');
-    }
-}
-
-function handleDragLeave(e) {
-    this.classList.remove('over');
-}
-
-function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation(); // stops the browser from redirecting
-    }
-    
-    // Don't do anything if dropping the same card we're dragging
-    if (draggedCard !== this) {
-        // Get the grid
+    // Simple draggable functionality
+    function makeProjectsDraggable() {
         const grid = document.querySelector('.classroom-grid');
+        const cards = document.querySelectorAll('.class-card');
         
-        // Get all draggable cards only
-        const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
+        cards.forEach(card => {
+            // Only make project cards draggable (not the "Create New Project" card)
+            const isProjectCard = card.querySelector('.class-header') && 
+                                   card.querySelector('.class-title') && 
+                                   card.querySelector('.class-body');
+            
+            if (isProjectCard) {
+                // Make card draggable
+                card.draggable = true;
+                card.style.cursor = 'move';
+                card.style.userSelect = 'none';
+                
+                // Drag events
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragover', handleDragOver);
+                card.addEventListener('dragenter', handleDragEnter);
+                card.addEventListener('dragleave', handleDragLeave);
+                card.addEventListener('drop', handleDrop);
+                card.addEventListener('dragend', handleDragEnd);
+            } else {
+                // This is the "Create New Project" card - make it non-draggable
+                card.draggable = false;
+                card.style.cursor = 'default';
+            }
+        });
+    }
+
+    // Setup click-to-copy for join codes
+    function setupJoinCodeCopying() {
+        const joinCodes = document.querySelectorAll('.class-code');
         
-        // Get the index of dragged card and target card
-        const draggedIndex = cards.indexOf(draggedCard);
-        const targetIndex = cards.indexOf(this);
+        joinCodes.forEach(codeElement => {
+            // Store original text
+            const originalText = codeElement.textContent;
+            
+            // Add cursor pointer for visual indication
+            codeElement.style.cursor = 'pointer';
+            codeElement.title = 'Click to copy join code';
+            
+            // Add hover effect
+            codeElement.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.05)';
+                this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+            });
+            
+            codeElement.addEventListener('mouseleave', function() {
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = 'none';
+            });
+            
+            // Add click event listener
+            codeElement.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent card from being dragged
+                e.preventDefault(); // Prevent any default behavior
+                
+                // Store original styles
+                const originalBackground = this.style.background;
+                const originalColor = this.style.color;
+                
+                // Copy text to clipboard
+                navigator.clipboard.writeText(originalText).then(() => {
+                    // Show feedback
+                    this.textContent = 'Copied!';
+                    this.style.background = '#48bb78';
+                    this.style.color = 'white';
+                    
+                    // Reset after 1.5 seconds
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                        this.style.background = originalBackground;
+                        this.style.color = originalColor;
+                    }, 1500);
+                    
+                    // Show notification
+                    showNotification('Join code copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                    showNotification('Failed to copy code');
+                });
+            });
+            
+            // Prevent drag events on the join code element
+            codeElement.addEventListener('dragstart', function(e) {
+                e.stopPropagation(); // Prevent card drag from starting
+                e.preventDefault(); // Prevent default drag behavior
+            });
+            
+            // Allow text selection on join code
+            codeElement.style.userSelect = 'text';
+            codeElement.style.webkitUserSelect = 'text';
+            codeElement.style.mozUserSelect = 'text';
+            codeElement.style.msUserSelect = 'text';
+        });
+    }
+
+    let draggedCard = null;
+
+    function handleDragStart(e) {
+        // Don't start drag if clicking on join code
+        if (e.target.classList.contains('class-code') || 
+            e.target.closest('.class-code')) {
+            e.preventDefault();
+            return;
+        }
         
-        if (draggedIndex < targetIndex) {
-            // Insert after the target
-            grid.insertBefore(draggedCard, this.nextSibling);
-        } else {
-            // Insert before the target
-            grid.insertBefore(draggedCard, this);
+        draggedCard = this;
+        this.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+    }
+
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault(); // Necessary to allow dropping
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        if (this !== draggedCard) {
+            this.classList.add('over');
         }
     }
-    
-    return false;
-}
 
-function handleDragEnd(e) {
-    // Reset the opacity
-    this.style.opacity = '1';
-    
-    // Remove over class from all cards
-    document.querySelectorAll('.class-card').forEach(card => {
-        card.classList.remove('over');
-    });
-    
-    // Save the new order
-    saveProjectOrder();
-}
+    function handleDragLeave(e) {
+        this.classList.remove('over');
+    }
 
-// Save project order to localStorage
-function saveProjectOrder() {
-    // Get only draggable cards (project cards)
-    const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
-    const projectIds = cards.map(card => {
-        // Try to get project ID from data attribute or extract from link
-        const link = card.querySelector('a.btn-primary');
-        if (link) {
-            const url = new URL(link.href, window.location.origin);
-            return url.searchParams.get('id');
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation(); // stops the browser from redirecting
         }
-        return null;
-    }).filter(id => id !== null);
-    
-    if (projectIds.length > 0) {
-        localStorage.setItem('projectOrder', JSON.stringify(projectIds));
-        showNotification('Project order saved!');
-    }
-}
-
-// Show notification
-function showNotification(message) {
-    // Create notification element
-    let notification = document.getElementById('drag-notification');
-    if (!notification) {
-        notification = document.createElement('div');
-        notification.id = 'drag-notification';
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #38a169;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            gap: 10px;
-        `;
-        notification.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
-        document.body.appendChild(notification);
-    }
-    
-    notification.querySelector('span').textContent = message;
-    notification.style.display = 'flex';
-    
-    setTimeout(() => {
-        notification.style.display = 'none';
-    }, 2000);
-}
-
-// Add CSS for drag and drop and join code styling
-const style = document.createElement('style');
-style.textContent = `
-    .class-card.over {
-        border: 2px dashed #667eea;
-        background: #f0f4ff;
-    }
-    
-    .class-card.dragging {
-        opacity: 0.5;
-        transform: rotate(3deg);
-    }
-    
-    /* Join code hover effects */
-    .class-code {
-        transition: all 0.2s ease;
-        cursor: pointer !important;
-    }
-    
-    /* Improve long text handling */
-    .class-title {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        line-height: 1.3;
-        max-height: 2.6em;
-    }
-    
-    .class-description {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        line-height: 1.4;
-        max-height: 2.8em;
-    }
-    
-    /* Style for the "Create New Project" card */
-    .class-card:not([draggable="true"]) {
-        cursor: default !important;
-    }
-`;
-document.head.appendChild(style);
-
-// Load saved order on page load
-window.addEventListener('load', function() {
-    const savedOrder = localStorage.getItem('projectOrder');
-    if (savedOrder) {
-        try {
-            const order = JSON.parse(savedOrder);
+        
+        // Don't do anything if dropping the same card we're dragging
+        if (draggedCard !== this) {
+            // Get the grid
             const grid = document.querySelector('.classroom-grid');
             
-            // Get only draggable cards (project cards)
-            const projectCards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
+            // Get all draggable cards only
+            const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
             
-            // Sort based on saved order
-            projectCards.sort((a, b) => {
-                const linkA = a.querySelector('a.btn-primary');
-                const linkB = b.querySelector('a.btn-primary');
-                const idA = new URL(linkA.href, window.location.origin).searchParams.get('id');
-                const idB = new URL(linkB.href, window.location.origin).searchParams.get('id');
-                
-                const indexA = order.indexOf(idA);
-                const indexB = order.indexOf(idB);
-                
-                return indexA - indexB;
-            });
+            // Get the index of dragged card and target card
+            const draggedIndex = cards.indexOf(draggedCard);
+            const targetIndex = cards.indexOf(this);
             
-            // Get the "Create New Project" card (non-draggable)
-            const createCard = document.querySelector('.class-card:not([draggable="true"])');
-            
-            // Clear the grid first
-            while (grid.firstChild) {
-                grid.removeChild(grid.firstChild);
+            if (draggedIndex < targetIndex) {
+                // Insert after the target
+                grid.insertBefore(draggedCard, this.nextSibling);
+            } else {
+                // Insert before the target
+                grid.insertBefore(draggedCard, this);
             }
-            
-            // Add sorted project cards
-            projectCards.forEach(card => {
-                grid.appendChild(card);
-            });
-            
-            // Add create card at the end
-            if (createCard) {
-                grid.appendChild(createCard);
+        }
+        
+        return false;
+    }
+
+    function handleDragEnd(e) {
+        // Reset the opacity
+        this.style.opacity = '1';
+        
+        // Remove over class from all cards
+        document.querySelectorAll('.class-card').forEach(card => {
+            card.classList.remove('over');
+        });
+        
+        // Save the new order
+        saveProjectOrder();
+    }
+
+    // Save project order to localStorage
+    function saveProjectOrder() {
+        // Get only draggable cards (project cards)
+        const cards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
+        const projectIds = cards.map(card => {
+            // Try to get project ID from data attribute or extract from link
+            const link = card.querySelector('a.btn-primary');
+            if (link) {
+                const url = new URL(link.href, window.location.origin);
+                return url.searchParams.get('id');
             }
-        } catch (e) {
-            console.error('Error loading saved order:', e);
+            return null;
+        }).filter(id => id !== null);
+        
+        if (projectIds.length > 0) {
+            localStorage.setItem('projectOrder', JSON.stringify(projectIds));
+            showNotification('Project order saved!');
         }
     }
-});
-</script>
+
+    // Show notification
+    function showNotification(message) {
+        // Create notification element
+        let notification = document.getElementById('drag-notification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'drag-notification';
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #38a169;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 1000;
+                display: none;
+                align-items: center;
+                gap: 10px;
+            `;
+            notification.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
+            document.body.appendChild(notification);
+        }
+        
+        notification.querySelector('span').textContent = message;
+        notification.style.display = 'flex';
+        
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 2000);
+    }
+
+    // Add CSS for drag and drop and join code styling
+    const style = document.createElement('style');
+    style.textContent = `
+        .class-card.over {
+            border: 2px dashed #667eea;
+            background: #f0f4ff;
+        }
+        
+        .class-card.dragging {
+            opacity: 0.5;
+            transform: rotate(3deg);
+        }
+        
+        /* Join code hover effects */
+        .class-code {
+            transition: all 0.2s ease;
+            cursor: pointer !important;
+        }
+        
+        /* Improve long text handling */
+        .class-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.3;
+            max-height: 2.6em;
+        }
+        
+        .class-description {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.4;
+            max-height: 2.8em;
+        }
+        
+        /* Style for the "Create New Project" card */
+        .class-card:not([draggable="true"]) {
+            cursor: default !important;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Load saved order on page load
+    window.addEventListener('load', function() {
+        const savedOrder = localStorage.getItem('projectOrder');
+        if (savedOrder) {
+            try {
+                const order = JSON.parse(savedOrder);
+                const grid = document.querySelector('.classroom-grid');
+                
+                // Get only draggable cards (project cards)
+                const projectCards = Array.from(document.querySelectorAll('.class-card[draggable="true"]'));
+                
+                // Sort based on saved order
+                projectCards.sort((a, b) => {
+                    const linkA = a.querySelector('a.btn-primary');
+                    const linkB = b.querySelector('a.btn-primary');
+                    const idA = new URL(linkA.href, window.location.origin).searchParams.get('id');
+                    const idB = new URL(linkB.href, window.location.origin).searchParams.get('id');
+                    
+                    const indexA = order.indexOf(idA);
+                    const indexB = order.indexOf(idB);
+                    
+                    return indexA - indexB;
+                });
+                
+                // Get the "Create New Project" card (non-draggable)
+                const createCard = document.querySelector('.class-card:not([draggable="true"])');
+                
+                // Clear the grid first
+                while (grid.firstChild) {
+                    grid.removeChild(grid.firstChild);
+                }
+                
+                // Add sorted project cards
+                projectCards.forEach(card => {
+                    grid.appendChild(card);
+                });
+                
+                // Add create card at the end
+                if (createCard) {
+                    grid.appendChild(createCard);
+                }
+            } catch (e) {
+                console.error('Error loading saved order:', e);
+            }
+        }
+    });
+    </script>
 </body>
 </html>
