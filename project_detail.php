@@ -99,6 +99,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
                     }
                 }
                 
+                // Log the task creation in progress tracking
+                $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+                           VALUES ('$task_id', '$user_id', 'Task created')";
+                mysqli_query($conn, $log_sql);
+                
                 $success = "Task created successfully!";
                 // Refresh to show the new task
                 header("Location: project_detail.php?id=$project_id&manage=true");
@@ -112,20 +117,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
     }
 }
 
-// Handle task status update
+// Handle task status update with progress tracking
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $task_id = intval($_POST['task_id']);
     $new_status = $_POST['status'];
+    $old_status = ''; // We'll get this from the database
     
-    // Verify user has access to this task
+    // Verify user has access to this task and get old status
     $verify_sql = "SELECT t.* FROM tasks t 
                    JOIN project_members pm ON t.project_id = pm.project_id 
                    WHERE t.id = '$task_id' AND pm.user_id = '$user_id' AND t.project_id = '$project_id' AND t.is_deleted = 0";
     $verify_result = mysqli_query($conn, $verify_sql);
     
     if (mysqli_num_rows($verify_result) > 0) {
+        $task = mysqli_fetch_assoc($verify_result);
+        $old_status = $task['status'];
+        
         $update_sql = "UPDATE tasks SET status = '$new_status' WHERE id = '$task_id' AND is_deleted = 0";
         if (mysqli_query($conn, $update_sql)) {
+            // Log the status change in progress tracking
+            $progress_note = "Status changed: " . ucfirst(str_replace('_', ' ', $old_status)) . 
+                           " → " . ucfirst(str_replace('_', ' ', $new_status));
+            
+            // Check if it's a specific action
+            if ($old_status == 'pending' && $new_status == 'in_progress') {
+                $progress_note = "Started working on the task";
+            } elseif ($old_status == 'in_progress' && $new_status == 'completed') {
+                $progress_note = "Marked task as completed";
+            } elseif ($old_status == 'completed' && $new_status == 'in_progress') {
+                $progress_note = "Reopened the task";
+            } elseif ($old_status == 'in_progress' && $new_status == 'pending') {
+                $progress_note = "Moved task back to pending";
+            }
+            
+            $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+                       VALUES ('$task_id', '$user_id', '$progress_note')";
+            mysqli_query($conn, $log_sql);
+            
             $success = "Task status updated!";
         } else {
             $error = "Error updating task: " . mysqli_error($conn);
@@ -135,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     }
 }
 
-// Handle task halt (only for supervisors)
+// Handle task halt (only for supervisors) with progress tracking
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['halt_task']) && $is_supervisor) {
     $task_id = intval($_POST['task_id']);
     
@@ -145,8 +173,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['halt_task']) && $is_su
     $verify_result = mysqli_query($conn, $verify_sql);
     
     if (mysqli_num_rows($verify_result) > 0) {
+        $task = mysqli_fetch_assoc($verify_result);
+        $old_status = $task['status'];
+        
         $update_sql = "UPDATE tasks SET status = 'halted' WHERE id = '$task_id' AND project_id = '$project_id' AND is_deleted = 0";
         if (mysqli_query($conn, $update_sql)) {
+            // Log the halt action in progress tracking
+            $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+                       VALUES ('$task_id', '$user_id', 'Task halted by supervisor')";
+            mysqli_query($conn, $log_sql);
+            
             $success = "Task has been halted!";
         } else {
             $error = "Error halting task: " . mysqli_error($conn);
@@ -156,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['halt_task']) && $is_su
     }
 }
 
-// Handle task resume (only for supervisors)
+// Handle task resume (only for supervisors) with progress tracking
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['resume_task']) && $is_supervisor) {
     $task_id = intval($_POST['task_id']);
     $new_status = $_POST['resume_status']; // Determine which status to resume to
@@ -169,6 +205,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['resume_task']) && $is_
     if (mysqli_num_rows($verify_result) > 0) {
         $update_sql = "UPDATE tasks SET status = '$new_status' WHERE id = '$task_id' AND project_id = '$project_id' AND is_deleted = 0";
         if (mysqli_query($conn, $update_sql)) {
+            // Log the resume action in progress tracking
+            $progress_note = "Task resumed by supervisor to " . ucfirst(str_replace('_', ' ', $new_status));
+            $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+                       VALUES ('$task_id', '$user_id', '$progress_note')";
+            mysqli_query($conn, $log_sql);
+            
             $success = "Task has been resumed!";
         } else {
             $error = "Error resuming task: " . mysqli_error($conn);
@@ -178,12 +220,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['resume_task']) && $is_
     }
 }
 
-// Handle task deletion (only for supervisors)
+// Handle task deletion (only for supervisors) with progress tracking
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_task']) && $is_supervisor) {
     $task_id = intval($_POST['task_id']);
     
     // Double check if user is the supervisor
     if ($project['supervisor_id'] == $user_id) {
+        // First log the deletion in progress tracking
+        $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+                   VALUES ('$task_id', '$user_id', 'Task deleted by supervisor')";
+        mysqli_query($conn, $log_sql);
+        
         // Soft delete the task
         $delete_sql = "UPDATE tasks SET is_deleted = 1, deleted_at = NOW() WHERE id = '$task_id' AND project_id = '$project_id'";
         
@@ -377,6 +424,20 @@ while ($row = mysqli_fetch_assoc($tasks_result)) {
     $today = date('Y-m-d');
     $row['is_overdue'] = ($row['due_date'] && $row['due_date'] < $today && $row['status'] != 'completed' && $row['status'] != 'halted');
     $tasks[] = $row;
+}
+
+// Get project progress history
+$progress_sql = "SELECT tp.*, u.username, t.title as task_title
+                 FROM task_progress tp
+                 JOIN users u ON tp.user_id = u.id
+                 JOIN tasks t ON tp.task_id = t.id
+                 WHERE t.project_id = '$project_id'
+                 ORDER BY tp.created_at DESC
+                 LIMIT 50"; // Show last 50 activities
+$progress_result = mysqli_query($conn, $progress_sql);
+$progress_history = [];
+while ($row = mysqli_fetch_assoc($progress_result)) {
+    $progress_history[] = $row;
 }
 
 // Categorize tasks by status
@@ -1036,6 +1097,117 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             background: #5d3a7f;
         }
 
+        /* Project Progress Tracking Styles */
+        .progress-history-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 0;
+            border-bottom: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        .progress-item:last-child {
+            border-bottom: none;
+        }
+
+        .progress-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #edf2f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+            color: #764BA2;
+        }
+
+        .progress-content {
+            flex: 1;
+        }
+
+        .progress-action {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .progress-details {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .progress-meta {
+            display: flex;
+            gap: 15px;
+            color: #a0aec0;
+            font-size: 12px;
+        }
+
+        .progress-task {
+            color: #764BA2;
+            font-weight: 500;
+        }
+
+        .progress-user {
+            color: #f59e0b;
+            font-weight: 500;
+        }
+
+        .progress-time {
+            font-style: italic;
+        }
+
+        .progress-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0aec0;
+        }
+
+        .progress-empty i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #cbd5e0;
+        }
+
+        .progress-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #4a5568;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .filter-btn.active {
+            background: #764BA2;
+            color: white;
+            border-color: #764BA2;
+        }
+
+        .filter-btn:hover {
+            border-color: #764BA2;
+        }
+
         /* For mobile responsiveness */
         @media (max-width: 768px) {
             .project-title {
@@ -1069,6 +1241,23 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             }
             
             .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .progress-item {
+                flex-direction: column;
+            }
+            
+            .progress-icon {
+                margin-bottom: 10px;
+            }
+            
+            .progress-meta {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .manage-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -1564,6 +1753,15 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                             <p>Edit task details</p>
                         </div>
 
+                        <!-- Project Progress Card -->
+                        <div class="manage-card" onclick="document.getElementById('projectProgress').scrollIntoView({behavior: 'smooth'})">
+                            <div class="manage-icon">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <h4>Project Progress</h4>
+                            <p>Track team activities</p>
+                        </div>
+
                         <!-- Delete Project Card -->
                         <div class="manage-card" onclick="showDeleteConfirmation()">
                             <div class="manage-icon">
@@ -1773,6 +1971,89 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                     </div>
                 </div>
                 
+                <!-- Project Progress Tracking Section -->
+                <div class="progress-history-section" id="projectProgress">
+                    <h3><i class="fas fa-history"></i> Project Progress Tracking</h3>
+                    <p>See who did what and when in the project. All task updates are automatically recorded here.</p>
+                    
+                    <div class="progress-filter" id="progressFilter">
+                        <button class="filter-btn active" data-filter="all">All Activities</button>
+                        <button class="filter-btn" data-filter="status">Status Changes</button>
+                        <button class="filter-btn" data-filter="task">Task Created</button>
+                        <button class="filter-btn" data-filter="halt">Task Halted/Resumed</button>
+                        <button class="filter-btn" data-filter="delete">Task Deleted</button>
+                        <button class="filter-btn" data-filter="supervisor">Supervisor Actions</button>
+                    </div>
+                    
+                    <div id="progressList">
+                        <?php if (!empty($progress_history)): ?>
+                            <?php foreach ($progress_history as $progress): ?>
+                                <?php 
+                                $icon = 'fas fa-edit';
+                                $color = '#764BA2';
+                                $type = 'general';
+                                
+                                // Determine icon and type based on progress note
+                                if (strpos($progress['progress_note'], 'Task created') !== false) {
+                                    $icon = 'fas fa-plus-circle';
+                                    $color = '#10b981';
+                                    $type = 'task';
+                                } elseif (strpos($progress['progress_note'], 'Status changed') !== false || 
+                                         strpos($progress['progress_note'], 'started') !== false ||
+                                         strpos($progress['progress_note'], 'completed') !== false ||
+                                         strpos($progress['progress_note'], 'reopened') !== false ||
+                                         strpos($progress['progress_note'], 'back to pending') !== false) {
+                                    $icon = 'fas fa-exchange-alt';
+                                    $color = '#4299e1';
+                                    $type = 'status';
+                                } elseif (strpos($progress['progress_note'], 'halted') !== false || 
+                                         strpos($progress['progress_note'], 'resumed') !== false) {
+                                    $icon = 'fas fa-pause-circle';
+                                    $color = '#ed8936';
+                                    $type = 'halt';
+                                } elseif (strpos($progress['progress_note'], 'deleted') !== false) {
+                                    $icon = 'fas fa-trash-alt';
+                                    $color = '#e53e3e';
+                                    $type = 'delete';
+                                } elseif (strpos($progress['progress_note'], 'supervisor') !== false) {
+                                    $icon = 'fas fa-user-shield';
+                                    $color = '#f59e0b';
+                                    $type = 'supervisor';
+                                }
+                                ?>
+                                
+                                <div class="progress-item" data-type="<?php echo $type; ?>">
+                                    <div class="progress-icon" style="background-color: <?php echo $color; ?>20; color: <?php echo $color; ?>;">
+                                        <i class="<?php echo $icon; ?>"></i>
+                                    </div>
+                                    <div class="progress-content">
+                                        <div class="progress-action">
+                                            <?php echo htmlspecialchars($progress['progress_note']); ?>
+                                        </div>
+                                        <div class="progress-details">
+                                            Task: <span class="progress-task"><?php echo htmlspecialchars($progress['task_title']); ?></span>
+                                        </div>
+                                        <div class="progress-meta">
+                                            <span class="progress-user">
+                                                <i class="fas fa-user"></i> <?php echo htmlspecialchars($progress['username']); ?>
+                                            </span>
+                                            <span class="progress-time">
+                                                <i class="fas fa-clock"></i> <?php echo date('M j, Y g:i A', strtotime($progress['created_at'])); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="progress-empty">
+                                <i class="fas fa-history"></i>
+                                <h4>No activity yet</h4>
+                                <p>Project progress tracking will appear here when team members update tasks.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <!-- Task List for Management -->
                 <div class="members-list" id="all-tasks">
                     <h3><i class="fas fa-tasks"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
@@ -2179,6 +2460,9 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             
             // Initial check
             checkOverdueTasks();
+            
+            // Initialize progress filter - FIXED VERSION
+            initProgressFilter();
         });
         
         // Check for overdue tasks and highlight them
@@ -2222,6 +2506,70 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                 option.selected = selectAll;
             });
             updateSelectedCount();
+        }
+        
+        // Progress tracking filter functionality - FIXED VERSION
+        function initProgressFilter() {
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const progressItems = document.querySelectorAll('.progress-item');
+            
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    const filter = this.getAttribute('data-filter');
+                    
+                    // Show/hide progress items based on filter
+                    progressItems.forEach(item => {
+                        const type = item.getAttribute('data-type');
+                        
+                        if (filter === 'all' || filter === type) {
+                            item.style.display = 'flex';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                    
+                    // Check if we should show empty message
+                    const visibleItems = Array.from(progressItems).filter(item => 
+                        item.style.display !== 'none'
+                    );
+                    
+                    let emptyMessage = document.querySelector('.progress-empty');
+                    
+                    if (visibleItems.length === 0) {
+                        // Check if empty message already exists
+                        const existingEmpty = document.querySelector('#progressList .progress-empty');
+                        if (!existingEmpty) {
+                            emptyMessage = document.createElement('div');
+                            emptyMessage.className = 'progress-empty';
+                            emptyMessage.innerHTML = `
+                                <i class="fas fa-filter"></i>
+                                <h4>No activities found</h4>
+                                <p>No ${filter} activities found for this filter.</p>
+                            `;
+                            document.getElementById('progressList').appendChild(emptyMessage);
+                        }
+                    } else {
+                        // Remove empty message if it exists
+                        const existingEmpty = document.querySelector('#progressList .progress-empty');
+                        if (existingEmpty) {
+                            existingEmpty.remove();
+                        }
+                    }
+                });
+            });
+            
+            // Make sure all items are visible initially
+            if (filterButtons.length > 0) {
+                progressItems.forEach(item => {
+                    item.style.display = 'flex';
+                });
+            }
         }
     </script>
 </body>
