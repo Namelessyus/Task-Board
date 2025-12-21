@@ -263,6 +263,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['remove_member']) && $i
     }
 }
 
+// Handle project update (only for supervisors)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_project']) && $is_supervisor) {
+    $new_title = mysqli_real_escape_string($conn, $_POST['project_title']);
+    $new_description = mysqli_real_escape_string($conn, $_POST['project_description']);
+    $new_priority = $_POST['project_priority'];
+    
+    // Handle due_date properly with validation
+    $new_due_date = $_POST['project_due_date'];
+    if (empty($new_due_date)) {
+        $new_due_date = "NULL";
+    } else {
+        // Validate due date - must be today or in the future
+        $today = date('Y-m-d');
+        if ($new_due_date < $today) {
+            $error = "Project due date cannot be in the past! Please select today or a future date.";
+        } else {
+            $new_due_date = "'$new_due_date'";
+        }
+    }
+    
+    if (empty($error)) {
+        if (!empty($new_title)) {
+            // Update the project
+            $update_sql = "UPDATE projects SET 
+                          title = '$new_title', 
+                          description = '$new_description', 
+                          priority = '$new_priority', 
+                          due_date = $new_due_date 
+                          WHERE id = '$project_id' AND supervisor_id = '$user_id'";
+            
+            if (mysqli_query($conn, $update_sql)) {
+                $success = "Project updated successfully!";
+                // Refresh to show updated details
+                header("Location: project_detail.php?id=$project_id&manage=true#projectSettings");
+                exit();
+            } else {
+                $error = "Error updating project: " . mysqli_error($conn);
+            }
+        } else {
+            $error = "Project title is required!";
+        }
+    }
+}
+
 // Handle project deletion (only for supervisors) - SOFT DELETE
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $is_supervisor) {
     // Double check if user is the supervisor
@@ -920,6 +964,78 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
         }
 
+        /* Project Settings Styles */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .settings-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .settings-card h4 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #764BA2;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .settings-info {
+            color: #718096;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .settings-info strong {
+            color: #4a5568;
+        }
+
+        .join-code-box {
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .join-code {
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: #764BA2;
+            letter-spacing: 2px;
+            margin: 10px 0;
+        }
+
+        .copy-btn {
+            background: #764BA2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 auto;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5d3a7f;
+        }
+
         /* For mobile responsiveness */
         @media (max-width: 768px) {
             .project-title {
@@ -950,6 +1066,10 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             
             #teamManagement .member-item > div:last-child {
                 align-self: flex-end;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1427,12 +1547,21 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                         </div>
 
                         <!-- Project Settings Card -->
-                        <div class="manage-card">
+                        <div class="manage-card" onclick="document.getElementById('projectSettings').scrollIntoView({behavior: 'smooth'})">
                             <div class="manage-icon">
                                 <i class="fas fa-sliders-h"></i>
                             </div>
                             <h4>Project Settings</h4>
-                            <p>Edit project details and settings</p>
+                            <p>Edit project details</p>
+                        </div>
+
+                        <!-- Task Settings Card -->
+                        <div class="manage-card" onclick="document.getElementById('taskSettings').scrollIntoView({behavior: 'smooth'})">
+                            <div class="manage-icon">
+                                <i class="fas fa-sliders-h"></i>
+                            </div>
+                            <h4>Task Settings</h4>
+                            <p>Edit task details</p>
                         </div>
 
                         <!-- Delete Project Card -->
@@ -1565,6 +1694,9 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                     </div>
                     
                     <div style="margin-top: 25px; padding: 20px; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <h4 style="color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-info-circle" style="color: #764BA2;"></i> Team Management Information
+                        </h4>
                         
                         
                         <div style="display: flex; gap: 15px; margin-top: 15px;">
@@ -1592,6 +1724,51 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                                     Participants
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project Settings Section -->
+                <div class="members-list" id="projectSettings">
+                    <h3><i class="fas fa-sliders-h"></i> Project Settings</h3>
+                    <p style="color: #718096; margin-bottom: 20px;">Edit your project details here.</p>
+                    
+                    <div class="settings-grid">
+                        <!-- Edit Project Form -->
+                        <div class="settings-card">
+                            <h4><i class="fas fa-edit"></i> Edit Project Details</h4>
+                            <form method="POST" action="" onsubmit="return validateProjectForm()">
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; color: #4a5568; font-weight: 500;">Project Title</label>
+                                    <input type="text" name="project_title" class="form-input" value="<?php echo htmlspecialchars($project['title']); ?>" required>
+                                </div>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; color: #4a5568; font-weight: 500;">Description</label>
+                                    <textarea name="project_description" class="form-input" rows="4"><?php echo htmlspecialchars($project['description']); ?></textarea>
+                                </div>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; color: #4a5568; font-weight: 500;">Priority</label>
+                                    <select name="project_priority" class="form-input">
+                                        <option value="low" <?php echo $project['priority'] == 'low' ? 'selected' : ''; ?>>Low</option>
+                                        <option value="medium" <?php echo $project['priority'] == 'medium' ? 'selected' : ''; ?>>Medium</option>
+                                        <option value="high" <?php echo $project['priority'] == 'high' ? 'selected' : ''; ?>>High</option>
+                                    </select>
+                                </div>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; margin-bottom: 5px; color: #4a5568; font-weight: 500;">Due Date (Optional)</label>
+                                    <input type="date" name="project_due_date" class="form-input" id="project_due_date" 
+                                           value="<?php echo $project['due_date'] ? $project['due_date'] : ''; ?>" 
+                                           min="<?php echo date('Y-m-d'); ?>">
+                                    <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Select today or a future date</small>
+                                </div>
+                                
+                                <button type="submit" name="update_project" class="btn-manage btn-primary" style="width: 100%;">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -1850,6 +2027,20 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             
             return true;
         }
+
+        // Project form validation
+        function validateProjectForm() {
+            const projectDueDateInput = document.getElementById('project_due_date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (projectDueDateInput.value && projectDueDateInput.value < today) {
+                alert('Project due date cannot be in the past! Please select today or a future date.');
+                projectDueDateInput.focus();
+                return false;
+            }
+            
+            return true;
+        }
         
         // Update selected count for multiple select
         function updateSelectedCount() {
@@ -1885,10 +2076,65 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                 }
             });
         }
+
+        // Copy join code to clipboard
+        function copyJoinCode() {
+            const joinCode = "<?php echo $project['join_code']; ?>";
+            navigator.clipboard.writeText(joinCode).then(() => {
+                // Show success message
+                const copyBtn = document.querySelector('.copy-btn');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                copyBtn.style.background = '#38a169';
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.style.background = '#764BA2';
+                }, 2000);
+                
+                // Show notification
+                showNotification('Join code copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy join code. Please try again.');
+            });
+        }
+
+        // Show notification
+        function showNotification(message) {
+            // Create notification element
+            let notification = document.getElementById('copy-notification');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'copy-notification';
+                notification.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: #38a169;
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 1000;
+                    display: none;
+                    align-items: center;
+                    gap: 10px;
+                `;
+                document.body.appendChild(notification);
+            }
+            
+            notification.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
+            notification.style.display = 'flex';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
         
         // Set minimum date for task due date
         document.addEventListener('DOMContentLoaded', function() {
             const taskDueDateInput = document.getElementById('task_due_date');
+            const projectDueDateInput = document.getElementById('project_due_date');
             const today = new Date().toISOString().split('T')[0];
             
             if (taskDueDateInput) {
@@ -1897,6 +2143,15 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                 // If there's a previous value that's in the past, clear it
                 if (taskDueDateInput.value && taskDueDateInput.value < today) {
                     taskDueDateInput.value = today;
+                }
+            }
+
+            if (projectDueDateInput) {
+                projectDueDateInput.min = today;
+                
+                // If there's a previous value that's in the past, clear it
+                if (projectDueDateInput.value && projectDueDateInput.value < today) {
+                    projectDueDateInput.value = today;
                 }
             }
             
