@@ -122,13 +122,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         button:hover {
-            background: #5a6fd8;
+            background: #492a68ff;
         }
 
         .back-link {
             display: inline-block;
             margin-top: 20px;
-            color: #667eea;
+            color: #764BA2;
             text-decoration: none;
             font-weight: 500;
             text-align: center;

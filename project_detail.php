@@ -310,6 +310,57 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['remove_member']) && $i
     }
 }
 
+// Handle leave project (for participants only)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['leave_project'])) {
+    // Check if user is a participant (not supervisor)
+    if (!$is_supervisor && $is_member) {
+        // Start transaction for safe operations
+        mysqli_begin_transaction($conn);
+        
+        try {
+            // 1. Remove the member from project_members
+            $leave_sql = "DELETE FROM project_members 
+                         WHERE user_id = '$user_id' 
+                         AND project_id = '$project_id'";
+            
+            if (!mysqli_query($conn, $leave_sql)) {
+                throw new Exception("Error leaving project: " . mysqli_error($conn));
+            }
+            
+            // 2. Remove any task assignments for this user in this project
+            $remove_assignments_sql = "DELETE ta FROM task_assignments ta
+                                       JOIN tasks t ON ta.task_id = t.id
+                                       WHERE ta.user_id = '$user_id'
+                                       AND t.project_id = '$project_id'";
+            
+            mysqli_query($conn, $remove_assignments_sql);
+            
+            // 3. Update any tasks assigned solely to this user to have NULL assigned_to
+            $update_tasks_sql = "UPDATE tasks 
+                                 SET assigned_to = NULL 
+                                 WHERE project_id = '$project_id' 
+                                 AND assigned_to = '$user_id'";
+            
+            mysqli_query($conn, $update_tasks_sql);
+            
+            // Commit the transaction
+            mysqli_commit($conn);
+            
+            // Redirect to dashboard with success message
+            $_SESSION['success'] = "You have successfully left the project: " . htmlspecialchars($project['title']);
+            header("Location: dashboard.php");
+            exit();
+            
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            mysqli_rollback($conn);
+            $error = "Error: " . $e->getMessage();
+        }
+    } else {
+        $error = "Only participants can leave the project. Supervisors cannot leave.";
+    }
+}
+
 // Handle project update (only for supervisors)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_project']) && $is_supervisor) {
     $new_title = mysqli_real_escape_string($conn, $_POST['project_title']);
@@ -500,6 +551,10 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             align-items: center;
             order: 3;
             margin: 5px 0;
+        }
+
+        a, a:visited, a:hover, a:active {
+            color: inherit;
         }
 
         .meta-item {
@@ -799,6 +854,29 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             right: 10px;
         }
         
+        /* Leave Project Button */
+        .leave-project-btn {
+            background: #718096;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            margin-top: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .leave-project-btn:hover {
+            background: #5d6b7a;
+            transform: translateY(-2px);
+        }
+        
         /* For mobile responsiveness */
         @media (max-width: 768px) {
             .project-title {
@@ -1025,188 +1103,225 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
         }
 
-        /* Project Settings Styles */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+      /* Project Settings Styles */
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
 
-        .settings-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
-        }
+.settings-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #e2e8f0;
+}
 
-        .settings-card h4 {
-            color: #2d3748;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #764BA2;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+.settings-card h4 {
+    color: #2d3748;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #764BA2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-        .settings-info {
-            color: #718096;
-            font-size: 14px;
-            line-height: 1.6;
-        }
+/* Form layout for side by side fields */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
 
-        .settings-info strong {
-            color: #4a5568;
-        }
+/* For small screens */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
 
-        .join-code-box {
-            background: #f7fafc;
-            border: 2px dashed #cbd5e0;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            margin: 15px 0;
-        }
+.settings-info {
+    color: #718096;
+    font-size: 14px;
+    line-height: 1.6;
+}
 
-        .join-code {
-            font-family: 'Courier New', monospace;
-            font-size: 24px;
-            font-weight: bold;
-            color: #764BA2;
-            letter-spacing: 2px;
-            margin: 10px 0;
-        }
+.settings-info strong {
+    color: #4a5568;
+}
 
-        .copy-btn {
-            background: #764BA2;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0 auto;
-            transition: background 0.3s;
-        }
+.join-code-box {
+    background: #f7fafc;
+    border: 2px dashed #cbd5e0;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    margin: 15px 0;
+}
 
-        .copy-btn:hover {
-            background: #5d3a7f;
-        }
+.join-code {
+    font-family: 'Courier New', monospace;
+    font-size: 24px;
+    font-weight: bold;
+    color: #764BA2;
+    letter-spacing: 2px;
+    margin: 10px 0;
+}
 
-        /* Project Progress Tracking Styles */
-        .progress-history-section {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+.copy-btn {
+    background: #764BA2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 auto;
+    transition: background 0.3s;
+}
 
-        .progress-item {
-            display: flex;
-            align-items: flex-start;
-            padding: 15px 0;
-            border-bottom: 1px solid #e2e8f0;
-            position: relative;
-        }
+.copy-btn:hover {
+    background: #5d3a7f;
+}
 
-        .progress-item:last-child {
-            border-bottom: none;
-        }
+/* Project Progress Tracking Styles */
+.progress-history-section {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
 
-        .progress-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #edf2f7;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            flex-shrink: 0;
-            color: #764BA2;
-        }
+.progress-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 15px 0;
+    border-bottom: 1px solid #e2e8f0;
+    position: relative;
+}
 
-        .progress-content {
-            flex: 1;
-        }
+.progress-item:last-child {
+    border-bottom: none;
+}
 
-        .progress-action {
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 5px;
-        }
+.progress-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #edf2f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    flex-shrink: 0;
+    color: #764BA2;
+}
 
-        .progress-details {
-            color: #718096;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
+.progress-content {
+    flex: 1;
+}
 
-        .progress-meta {
-            display: flex;
-            gap: 15px;
-            color: #a0aec0;
-            font-size: 12px;
-        }
+.progress-action {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 5px;
+}
 
-        .progress-task {
-            color: #764BA2;
-            font-weight: 500;
-        }
+.progress-details {
+    color: #718096;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
 
-        .progress-user {
-            color: #f59e0b;
-            font-weight: 500;
-        }
+.progress-meta {
+    display: flex;
+    gap: 15px;
+    color: #a0aec0;
+    font-size: 12px;
+}
 
-        .progress-time {
-            font-style: italic;
-        }
+.progress-task {
+    color: #764BA2;
+    font-weight: 500;
+}
 
-        .progress-empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: #a0aec0;
-        }
+.progress-user {
+    color: #f59e0b;
+    font-weight: 500;
+}
 
-        .progress-empty i {
-            font-size: 48px;
-            margin-bottom: 15px;
-            color: #cbd5e0;
-        }
+.progress-time {
+    font-style: italic;
+}
 
-        .progress-filter {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
+.progress-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #a0aec0;
+}
 
-        .filter-btn {
-            padding: 8px 16px;
-            border: 1px solid #e2e8f0;
-            background: white;
-            border-radius: 6px;
-            cursor: pointer;
-            color: #4a5568;
-            font-size: 13px;
-            transition: all 0.3s;
-        }
+.progress-empty i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: #cbd5e0;
+}
 
-        .filter-btn.active {
-            background: #764BA2;
-            color: white;
-            border-color: #764BA2;
-        }
+.progress-filter {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
 
-        .filter-btn:hover {
-            border-color: #764BA2;
-        }
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #4a5568;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.filter-btn.active {
+    background: #764BA2;
+    color: white;
+    border-color: #764BA2;
+}
+
+.filter-btn:hover {
+    border-color: #764BA2;
+}
+
+/* Form input styles */
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #4a5568;
+    background: white;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #764BA2;
+    box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+}
+
+/* Button hover effect */
+button[type="submit"]:hover {
+    background: #5d3a7f !important;
+}
 
         /* For mobile responsiveness */
         @media (max-width: 768px) {
@@ -1264,15 +1379,17 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
     </style>
 </head>
 <body>
+
     <!-- Header -->
     <header class="header">
         <div class="logo">
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-            <a href="dashboard.php" class="active">Home</a>
+            <a href="dashboard.php">Home</a>
             <a href="create_project.php">Create Project</a>
             <a href="join_project.php">Join Project</a>
+            <a href="calendar.php">Calendar</a>
             <a href="account.php">Account</a>
         </nav>
         <a href="logout.php" class="logout-btn">Logout</a>
@@ -1398,6 +1515,22 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                             </div>
                         </div>
                     <?php endforeach; ?>
+                    
+                    <!-- Leave Project Button (for participants only) -->
+                    <?php if (!$is_supervisor && $is_member): ?>
+                        <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+                            <h4 style="color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-sign-out-alt" style="color: #718096;"></i> Leave Project
+                            </h4>
+                            <p style="color: #718096; margin-bottom: 15px;">
+                                If you want to leave this project, you can click the button below. 
+                                You will be removed from all tasks and will lose access to this project.
+                            </p>
+                            <button type="button" onclick="showLeaveProjectModal()" class="leave-project-btn">
+                                <i class="fas fa-sign-out-alt"></i> Leave Project
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Task Board Section -->
@@ -1744,15 +1877,6 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                             <p>Edit project details</p>
                         </div>
 
-                        <!-- Task Settings Card -->
-                        <div class="manage-card" onclick="document.getElementById('taskSettings').scrollIntoView({behavior: 'smooth'})">
-                            <div class="manage-icon">
-                                <i class="fas fa-sliders-h"></i>
-                            </div>
-                            <h4>Task Settings</h4>
-                            <p>Edit task details</p>
-                        </div>
-
                         <!-- Project Progress Card -->
                         <div class="manage-card" onclick="document.getElementById('projectProgress').scrollIntoView({behavior: 'smooth'})">
                             <div class="manage-icon">
@@ -1760,6 +1884,17 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
                             </div>
                             <h4>Project Progress</h4>
                             <p>Track team activities</p>
+                        </div>
+
+                        <!-- Task Settings Card -->
+                        <div class="manage-card" onclick="document.getElementById('taskSettings').scrollIntoView({behavior: 'smooth'})">
+                            <a href="#Tasks" style="text-decoration: none;">
+                            <div class="manage-icon">
+                                <i class="fas fa-sliders-h"></i>
+                            </div>
+                            <h4>Task Settings</h4>
+                            <p>Edit task details</p>
+                            </a>
                         </div>
 
                         <!-- Delete Project Card -->
@@ -2056,7 +2191,7 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
 
                 <!-- Task List for Management -->
                 <div class="members-list" id="all-tasks">
-                    <h3><i class="fas fa-tasks"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
+                    <h3 id="Tasks"><i class="fas fa-tasks"></i> All Tasks (<?php echo count($tasks); ?>)</h3>
                     <?php foreach ($tasks as $task): ?>
                         <div class="member-item">
                             <div class="member-info">
@@ -2200,6 +2335,44 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         </div>
     </div>
 
+    <!-- Leave Project Modal -->
+    <div id="leaveProjectModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; text-align: center;">
+            <div style="font-size: 3rem; color: #718096; margin-bottom: 15px;">
+                <i class="fas fa-sign-out-alt"></i>
+            </div>
+            <h3 style="color: #2d3748; margin-bottom: 15px;">Leave Project?</h3>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <p style="color: #718096; margin-bottom: 15px;">
+                    Are you sure you want to leave the project "<strong><?php echo htmlspecialchars($project['title']); ?></strong>"?
+                </p>
+                
+                <div style="background: #fffaf0; border: 1px solid #feebc8; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="color: #c05621; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle"></i> What will happen:
+                    </h4>
+                    <ul style="color: #718096; font-size: 14px; padding-left: 20px; margin: 0;">
+                        <li>You will lose access to this project</li>
+                        <li>You will be removed from all assigned tasks</li>
+                        <li>Your progress notes will remain in the database</li>
+                        <li>You can rejoin using the project join code</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button onclick="hideLeaveProjectModal()" style="padding: 10px 20px; border: 1px solid #cbd5e0; background: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500; flex: 1;">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <form method="POST" action="" style="flex: 1;">
+                    <button type="submit" name="leave_project" style="padding: 10px 20px; background: #718096; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; width: 100%;">
+                        <i class="fas fa-sign-out-alt"></i> Leave Project
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Smooth scrolling for navigation
         document.querySelectorAll('.project-list a').forEach(anchor => {
@@ -2250,6 +2423,15 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
             document.getElementById('removeMemberModal').style.display = 'none';
         }
 
+        // Leave project functions
+        function showLeaveProjectModal() {
+            document.getElementById('leaveProjectModal').style.display = 'flex';
+        }
+
+        function hideLeaveProjectModal() {
+            document.getElementById('leaveProjectModal').style.display = 'none';
+        }
+
         // Toggle halted section
         let haltedExpanded = false;
         function toggleHaltedSection() {
@@ -2292,6 +2474,12 @@ $progress_percentage = $total_active_tasks > 0 ? round(($completed_count / $tota
         document.getElementById('removeMemberModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 hideRemoveMemberModal();
+            }
+        });
+        
+        document.getElementById('leaveProjectModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideLeaveProjectModal();
             }
         });
         
