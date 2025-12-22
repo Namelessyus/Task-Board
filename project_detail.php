@@ -1522,10 +1522,6 @@ button[type="submit"]:hover {
                             <h4 style="color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
                                 <i class="fas fa-sign-out-alt" style="color: #718096;"></i> Leave Project
                             </h4>
-                            <p style="color: #718096; margin-bottom: 15px;">
-                                If you want to leave this project, you can click the button below. 
-                                You will be removed from all tasks and will lose access to this project.
-                            </p>
                             <button type="button" onclick="showLeaveProjectModal()" class="leave-project-btn">
                                 <i class="fas fa-sign-out-alt"></i> Leave Project
                             </button>
