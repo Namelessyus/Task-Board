@@ -107,11 +107,51 @@ $stats_sql = "SELECT
     FROM users u
     LEFT JOIN projects p ON u.id = p.supervisor_id AND p.is_deleted = 0
     LEFT JOIN project_members pm ON u.id = pm.user_id
-    LEFT JOIN tasks t ON u.id = t.created_by OR u.id = t.assigned_to
+    LEFT JOIN projects p_active ON pm.project_id = p_active.id AND p_active.is_deleted = 0
+    LEFT JOIN tasks t ON (u.id = t.created_by OR u.id = t.assigned_to) 
+                      AND t.is_deleted = 0
+    LEFT JOIN projects p_task ON t.project_id = p_task.id AND p_task.is_deleted = 0
     WHERE u.id = '$user_id'";
     
 $stats_result = mysqli_query($conn, $stats_sql);
 $stats = mysqli_fetch_assoc($stats_result);
+
+// separates counts for better accuracy
+$projects_created_sql = "SELECT COUNT(*) as count FROM projects WHERE supervisor_id = '$user_id' AND is_deleted = 0";
+$projects_created_result = mysqli_query($conn, $projects_created_sql);
+$projects_created = mysqli_fetch_assoc($projects_created_result)['count'];
+
+$projects_joined_sql = "SELECT COUNT(DISTINCT pm.project_id) as count 
+                       FROM project_members pm 
+                       JOIN projects p ON pm.project_id = p.id 
+                       WHERE pm.user_id = '$user_id' AND p.is_deleted = 0";
+$projects_joined_result = mysqli_query($conn, $projects_joined_sql);
+$projects_joined = mysqli_fetch_assoc($projects_joined_result)['count'];
+
+$tasks_assigned_sql = "SELECT COUNT(DISTINCT t.id) as count 
+                      FROM tasks t 
+                      JOIN projects p ON t.project_id = p.id 
+                      LEFT JOIN task_assignments ta ON t.id = ta.task_id
+                      WHERE (t.created_by = '$user_id' OR ta.user_id = '$user_id') 
+                      AND t.is_deleted = 0 AND p.is_deleted = 0";
+$tasks_assigned_result = mysqli_query($conn, $tasks_assigned_sql);
+$tasks_assigned = mysqli_fetch_assoc($tasks_assigned_result)['count'];
+
+$tasks_completed_sql = "SELECT COUNT(DISTINCT t.id) as count 
+                       FROM tasks t 
+                       JOIN projects p ON t.project_id = p.id 
+                       LEFT JOIN task_assignments ta ON t.id = ta.task_id
+                       WHERE (t.created_by = '$user_id' OR ta.user_id = '$user_id') 
+                       AND t.status = 'completed' 
+                       AND t.is_deleted = 0 AND p.is_deleted = 0";
+$tasks_completed_result = mysqli_query($conn, $tasks_completed_sql);
+$tasks_completed = mysqli_fetch_assoc($tasks_completed_result)['count'];
+
+// Update stats array with accurate counts
+$stats['projects_created'] = $projects_created;
+$stats['projects_joined'] = $projects_joined;
+$stats['tasks_assigned'] = $tasks_assigned;
+$stats['tasks_completed'] = $tasks_completed;
 ?>
 <!DOCTYPE html>
 <html>
@@ -697,12 +737,12 @@ $stats = mysqli_fetch_assoc($stats_result);
             <a href="dashboard.php"><i class="fas fa-tasks"></i> Task Board</a>
         </div>
         <nav class="nav">
-    <a href="dashboard.php">Home</a>
-    <a href="create_project.php">Create Project</a>
-    <a href="join_project.php">Join Project</a>
-    <a href="calendar.php">Calendar</a>
-    <a href="account.php" class="active">Account</a>
-</nav>
+            <a href="dashboard.php">Home</a>
+            <a href="create_project.php">Create Project</a>
+            <a href="join_project.php">Join Project</a>
+            <a href="calendar.php">Calendar</a>
+            <a href="account.php" class="active">Account</a>
+        </nav>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
@@ -893,42 +933,6 @@ $stats = mysqli_fetch_assoc($stats_result);
                     </div>
                 </div>
                 
-                <div class="account-card">
-                    <h2><i class="fas fa-trophy"></i> Achievements</h2>
-                    <p>Your accomplishments on Task Board</p>
-                    
-                    <div style="margin-top: 20px;">
-                        <?php
-                        $achievements = [];
-                        
-                        if ($stats['projects_created'] >= 1) {
-                            $achievements[] = ['icon' => 'fa-star', 'title' => 'Project Creator', 'description' => 'Created your first project'];
-                        }
-                        if ($stats['projects_joined'] >= 1) {
-                            $achievements[] = ['icon' => 'fa-users', 'title' => 'Team Player', 'description' => 'Joined your first project'];
-                        }
-                        if ($stats['tasks_completed'] >= 1) {
-                            $achievements[] = ['icon' => 'fa-check-circle', 'title' => 'Task Master', 'description' => 'Completed your first task'];
-                        }
-                        if ($stats['tasks_completed'] >= 5) {
-                            $achievements[] = ['icon' => 'fa-medal', 'title' => 'Productivity Pro', 'description' => 'Completed 5+ tasks'];
-                        }
-                        
-                        if (empty($achievements)) {
-                            echo '<p style="color: #718096; text-align: center;">No achievements yet. Start creating or joining projects!</p>';
-                        } else {
-                            foreach ($achievements as $achievement) {
-                                echo '<div style="display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #e2e8f0;">';
-                                echo '<i class="fas ' . $achievement['icon'] . '" style="color: #764BA2; font-size: 20px;"></i>';
-                                echo '<div>';
-                                echo '<strong>' . $achievement['title'] . '</strong>';
-                                echo '<p style="color: #718096; margin: 0; font-size: 14px;">' . $achievement['description'] . '</p>';
-                                echo '</div>';
-                                echo '</div>';
-                            }
-                        }
-                        ?>
-                    </div>
                 </div>
             </div>
         </div>
