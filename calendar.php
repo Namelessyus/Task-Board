@@ -13,7 +13,7 @@ $user_id = $_SESSION['userid'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskBoard Calendar with Notifications</title>
+    <title>TaskBoard Calendar</title>
     <style>
     * {
         margin: 0;
@@ -243,13 +243,6 @@ $user_id = $_SESSION['userid'];
         color: #7f8c8d;
     }
 
-    .empty-day {
-        color: #666768ff;
-        font-size: 12px;
-        text-align: center;
-        margin-top: 10px;
-    }
-
     .event.priority-low {
         opacity: 0.7;
     }
@@ -339,44 +332,6 @@ $user_id = $_SESSION['userid'];
     .type-project_due { background: #2196f3; color: white; }
     .type-overdue { background: #f44336; color: white; }
 
-    .notification-settings {
-        margin-top: 20px;
-        padding: 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-
-    .settings-title {
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 15px;
-    }
-
-    .setting-item {
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-    }
-
-    .setting-item input[type="checkbox"] {
-        margin-right: 10px;
-    }
-
-    .dismiss-btn {
-        background: none;
-        border: none;
-        color: #888;
-        cursor: pointer;
-        padding: 5px;
-        font-size: 18px;
-        line-height: 1;
-    }
-
-    .dismiss-btn:hover {
-        color: #ff4444;
-    }
-
     @media (max-width: 768px) {
         .day-cell {
             min-height: 80px;
@@ -439,7 +394,7 @@ $user_id = $_SESSION['userid'];
         <div class="notification-panel" id="notificationPanel">
             <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
                 <strong>Upcoming & Overdue Items</strong>
-                <button onclick="clearAllNotifications()" style="background: none; border: none; color: #007bff; cursor: pointer;">Dismiss All</button>
+                <button onclick="refreshNotifications()" style="background: none; border: none; color: #007bff; cursor: pointer;">Refresh</button>
             </div>
             <div id="notificationList"></div>
         </div>
@@ -462,55 +417,12 @@ $user_id = $_SESSION['userid'];
                 <span>Overdue</span>
             </div>
         </div>
-
-        <!-- Notification Settings -->
-        <div class="notification-settings">
-            <div class="settings-title">Notification Settings</div>
-            <div class="setting-item">
-                <input type="checkbox" id="enableDesktop" checked onchange="updateNotificationSettings()">
-                <label for="enableDesktop">Enable Desktop Notifications</label>
-            </div>
-            <div class="setting-item">
-                <input type="checkbox" id="notifyTaskDue" checked onchange="updateNotificationSettings()">
-                <label for="notifyTaskDue">Notify about upcoming task due dates</label>
-            </div>
-            <div class="setting-item">
-                <input type="checkbox" id="notifyProjectDue" checked onchange="updateNotificationSettings()">
-                <label for="notifyProjectDue">Notify about upcoming project due dates</label>
-            </div>
-            <div class="setting-item">
-                <input type="checkbox" id="notifyOverdue" checked onchange="updateNotificationSettings()">
-                <label for="notifyOverdue">Notify about overdue items</label>
-            </div>
-            <div class="setting-item">
-                <label for="remindBefore">Remind before (days):</label>
-                <select id="remindBefore" onchange="updateNotificationSettings()" style="margin-left: 10px;">
-                    <option value="0">On due date</option>
-                    <option value="1" selected>1 day before</option>
-                    <option value="2">2 days before</option>
-                    <option value="3">3 days before</option>
-                    <option value="7">1 week before</option>
-                </select>
-            </div>
-            <div class="setting-item">
-                <label for="notificationInterval">Check every (minutes):</label>
-                <select id="notificationInterval" onchange="updateNotificationSettings()" style="margin-left: 10px;">
-                    <option value="5">5 minutes</option>
-                    <option value="15" selected>15 minutes</option>
-                    <option value="30">30 minutes</option>
-                    <option value="60">1 hour</option>
-                </select>
-            </div>
-        </div>
     </div>
 
     <script>
         let currentDate = new Date();
         let currentMonth = currentDate.getMonth();
         let currentYear = currentDate.getFullYear();
-        let notificationInterval;
-        let notificationPermission = false;
-        let notifiedItems = new Set(); // Store IDs of items we've already notified about
         let userTasks = [];
         let userProjects = [];
 
@@ -527,454 +439,159 @@ $user_id = $_SESSION['userid'];
                 return;
             }
             
-            // Request notification permission
-            requestNotificationPermission();
-            
-            // Load notification settings
-            loadNotificationSettings();
-            
             renderCalendar();
             loadCalendarData();
         });
-
-        function requestNotificationPermission() {
-            if ("Notification" in window) {
-                if (Notification.permission === "granted") {
-                    notificationPermission = true;
-                } else if (Notification.permission !== "denied") {
-                    Notification.requestPermission().then(permission => {
-                        notificationPermission = permission === "granted";
-                        if (notificationPermission) {
-                            showDesktopNotification("Notifications Enabled", "You will now receive desktop notifications for your tasks and projects.");
-                        }
-                    });
-                }
-            }
-        }
-
-        function showDesktopNotification(title, message) {
-            if (!notificationPermission) return;
-            
-            if (Notification.permission === "granted") {
-                const options = {
-                    body: message,
-                    icon: '/favicon.ico',
-                    requireInteraction: true
-                };
-                
-                const notification = new Notification(title, options);
-                
-                notification.onclick = function() {
-                    window.focus();
-                    notification.close();
-                };
-                
-                // Auto close after 10 seconds
-                setTimeout(() => notification.close(), 10000);
-            }
-        }
 
         function checkForDueItems() {
             if (!userTasks.length && !userProjects.length) return;
             
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const remindBeforeDays = parseInt(document.getElementById('remindBefore').value) || 1;
-            const reminderDate = new Date(today);
-            reminderDate.setDate(reminderDate.getDate() + remindBeforeDays);
-            
-            const notifications = [];
-            const notifiedToday = new Set();
-            
-            // Check tasks
-            if (document.getElementById('notifyTaskDue')?.checked) {
-                userTasks.forEach(task => {
-                    if (!task.due_date) return;
-                    
-                    const dueDate = new Date(task.due_date);
-                    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-                    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    
-                    // Check if due today or within reminder period
-                    if (dueDateOnly <= reminderDate && dueDateOnly >= todayOnly) {
-                        const daysUntilDue = Math.ceil((dueDateOnly - todayOnly) / (1000 * 60 * 60 * 24));
-                        const isDueToday = daysUntilDue === 0;
-                        const isDueSoon = daysUntilDue > 0 && daysUntilDue <= remindBeforeDays;
-                        
-                        if (isDueToday || isDueSoon) {
-                            const itemKey = `task_${task.id}_due_${dueDateOnly.toDateString()}`;
-                            if (!notifiedItems.has(itemKey)) {
-                                notifications.push({
-                                    type: 'task_due',
-                                    title: `Task ${isDueToday ? 'Due Today' : 'Due Soon'}: ${task.title}`,
-                                    message: `Task "${task.title}" is due ${isDueToday ? 'today' : 'in ' + daysUntilDue + ' day(s)'}${task.project_title ? ' in project: ' + task.project_title : ''}`,
-                                    priority: task.priority,
-                                    dueDate: task.due_date,
-                                    itemKey: itemKey
-                                });
-                                notifiedToday.add(itemKey);
-                            }
-                        }
-                    }
-                });
-            }
-            
-            // Check projects
-            if (document.getElementById('notifyProjectDue')?.checked) {
-                userProjects.forEach(project => {
-                    if (!project.due_date) return;
-                    
-                    const dueDate = new Date(project.due_date);
-                    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-                    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    
-                    // Check if due today or within reminder period
-                    if (dueDateOnly <= reminderDate && dueDateOnly >= todayOnly) {
-                        const daysUntilDue = Math.ceil((dueDateOnly - todayOnly) / (1000 * 60 * 60 * 24));
-                        const isDueToday = daysUntilDue === 0;
-                        const isDueSoon = daysUntilDue > 0 && daysUntilDue <= remindBeforeDays;
-                        
-                        if (isDueToday || isDueSoon) {
-                            const itemKey = `project_${project.id}_due_${dueDateOnly.toDateString()}`;
-                            if (!notifiedItems.has(itemKey)) {
-                                notifications.push({
-                                    type: 'project_due',
-                                    title: `Project ${isDueToday ? 'Due Today' : 'Due Soon'}: ${project.title}`,
-                                    message: `Project "${project.title}" is due ${isDueToday ? 'today' : 'in ' + daysUntilDue + ' day(s)'}`,
-                                    priority: project.priority,
-                                    dueDate: project.due_date,
-                                    itemKey: itemKey
-                                });
-                                notifiedToday.add(itemKey);
-                            }
-                        }
-                    }
-                });
-            }
-            
-            // Check for overdue items
-            if (document.getElementById('notifyOverdue')?.checked) {
-                const yesterday = new Date(today);
-                yesterday.setDate(yesterday.getDate() - 1);
-                
-                // Check overdue tasks
-                userTasks.forEach(task => {
-                    if (!task.due_date || task.status === 'completed') return;
-                    
-                    const dueDate = new Date(task.due_date);
-                    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-                    
-                    if (dueDateOnly < today) {
-                        const itemKey = `task_${task.id}_overdue_${today.toDateString()}`;
-                        if (!notifiedItems.has(itemKey)) {
-                            const daysOverdue = Math.ceil((today - dueDateOnly) / (1000 * 60 * 60 * 24));
-                            notifications.push({
-                                type: 'overdue',
-                                title: `⚠️ Task Overdue: ${task.title}`,
-                                message: `Task "${task.title}" is ${daysOverdue} day(s) overdue${task.project_title ? ' in project: ' + task.project_title : ''}`,
-                                priority: task.priority,
-                                dueDate: task.due_date,
-                                itemKey: itemKey
-                            });
-                            notifiedToday.add(itemKey);
-                        }
-                    }
-                });
-                
-                // Check overdue projects
-                userProjects.forEach(project => {
-                    if (!project.due_date) return;
-                    
-                    const dueDate = new Date(project.due_date);
-                    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-                    
-                    if (dueDateOnly < today) {
-                        const itemKey = `project_${project.id}_overdue_${today.toDateString()}`;
-                        if (!notifiedItems.has(itemKey)) {
-                            const daysOverdue = Math.ceil((today - dueDateOnly) / (1000 * 60 * 60 * 24));
-                            notifications.push({
-                                type: 'overdue',
-                                title: `⚠️ Project Overdue: ${project.title}`,
-                                message: `Project "${project.title}" is ${daysOverdue} day(s) overdue`,
-                                priority: project.priority,
-                                dueDate: project.due_date,
-                                itemKey: itemKey
-                            });
-                            notifiedToday.add(itemKey);
-                        }
-                    }
-                });
-            }
-            
-            // Show desktop notifications
-            if (document.getElementById('enableDesktop')?.checked && notifications.length > 0) {
-                notifications.forEach(notification => {
-                    showDesktopNotification(notification.title, notification.message);
-                });
-            }
             
             // Update notification panel if open
             if (document.getElementById('notificationPanel').style.display === 'block') {
                 updateNotificationPanel();
             }
             
-            // Add new notifications to notified items set
-            notifiedToday.forEach(itemKey => {
-                notifiedItems.add(itemKey);
-            });
-            
             // Update notification count
             updateNotificationCount();
-        }
-
-        function startNotificationPolling() {
-            // Clear existing interval
-            if (notificationInterval) {
-                clearInterval(notificationInterval);
-            }
-            
-            // Start new interval
-            const intervalMinutes = parseInt(document.getElementById('notificationInterval').value) || 15;
-            notificationInterval = setInterval(() => {
-                checkForDueItems();
-            }, intervalMinutes * 60 * 1000);
-            
-            // Also check immediately
-            checkForDueItems();
         }
 
         function updateNotificationPanel() {
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const remindBeforeDays = parseInt(document.getElementById('remindBefore').value) || 1;
-            const reminderDate = new Date(today);
-            reminderDate.setDate(reminderDate.getDate() + remindBeforeDays);
             
             const notificationList = document.getElementById('notificationList');
             let html = '';
             let count = 0;
             
-            // Store temporary IDs for this session
-            const notificationItems = [];
-            
-            // Check tasks
+            // Check tasks for overdue and items due this month
             userTasks.forEach(task => {
                 if (!task.due_date) return;
                 
                 const dueDate = new Date(task.due_date);
                 const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                 
-                if (dueDateOnly < today && task.status !== 'completed') {
+                // Check if overdue
+                if (dueDateOnly < today && (!task.status || task.status !== 'completed')) {
                     // Overdue task
                     const daysOverdue = Math.ceil((today - dueDateOnly) / (1000 * 60 * 60 * 24));
-                    const itemKey = `task_${task.id}_overdue_${today.toDateString()}`;
-                    
-                    if (!notifiedItems.has(itemKey)) {
-                        notificationItems.push({
-                            key: itemKey,
-                            type: 'overdue',
-                            title: `Overdue Task: ${task.title}`,
-                            message: `${daysOverdue} day(s) overdue${task.project_title ? ' in ' + task.project_title : ''}`,
-                            dueDate: task.due_date
-                        });
-                        count++;
-                    }
-                } else if (dueDateOnly <= reminderDate && dueDateOnly >= today) {
-                    // Upcoming task
+                    html += createNotificationHTML('overdue', 
+                        `Overdue Task: ${task.title}`, 
+                        `${daysOverdue} day(s) overdue${task.project_title ? ' in ' + task.project_title : ''}`,
+                        task.due_date);
+                    count++;
+                } 
+                // Check if due this month (including today and future dates in current month)
+                else if (dueDateOnly.getMonth() === currentMonth && 
+                         dueDateOnly.getFullYear() === currentYear) {
                     const daysUntilDue = Math.ceil((dueDateOnly - today) / (1000 * 60 * 60 * 24));
-                    const itemKey = `task_${task.id}_due_${dueDateOnly.toDateString()}`;
-                    
-                    if (!notifiedItems.has(itemKey)) {
-                        notificationItems.push({
-                            key: itemKey,
-                            type: 'task_due',
-                            title: `Task Due: ${task.title}`,
-                            message: `Due in ${daysUntilDue} day(s)${task.project_title ? ' in ' + task.project_title : ''}`,
-                            dueDate: task.due_date
-                        });
-                        count++;
-                    }
+                    html += createNotificationHTML('task_due', 
+                        `Task Due: ${task.title}`, 
+                        `Due in ${daysUntilDue} day(s)${task.project_title ? ' in ' + task.project_title : ''}`,
+                        task.due_date);
+                    count++;
                 }
             });
             
-            // Check projects
+            // Check projects for overdue and items due this month
             userProjects.forEach(project => {
                 if (!project.due_date) return;
                 
                 const dueDate = new Date(project.due_date);
                 const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                 
+                // Check if overdue
                 if (dueDateOnly < today) {
                     // Overdue project
                     const daysOverdue = Math.ceil((today - dueDateOnly) / (1000 * 60 * 60 * 24));
-                    const itemKey = `project_${project.id}_overdue_${today.toDateString()}`;
-                    
-                    if (!notifiedItems.has(itemKey)) {
-                        notificationItems.push({
-                            key: itemKey,
-                            type: 'overdue',
-                            title: `Overdue Project: ${project.title}`,
-                            message: `${daysOverdue} day(s) overdue`,
-                            dueDate: project.due_date
-                        });
-                        count++;
-                    }
-                } else if (dueDateOnly <= reminderDate && dueDateOnly >= today) {
-                    // Upcoming project
+                    html += createNotificationHTML('overdue', 
+                        `Overdue Project: ${project.title}`, 
+                        `${daysOverdue} day(s) overdue`,
+                        project.due_date);
+                    count++;
+                } 
+                // Check if due this month (including today and future dates in current month)
+                else if (dueDateOnly.getMonth() === currentMonth && 
+                         dueDateOnly.getFullYear() === currentYear) {
                     const daysUntilDue = Math.ceil((dueDateOnly - today) / (1000 * 60 * 60 * 24));
-                    const itemKey = `project_${project.id}_due_${dueDateOnly.toDateString()}`;
-                    
-                    if (!notifiedItems.has(itemKey)) {
-                        notificationItems.push({
-                            key: itemKey,
-                            type: 'project_due',
-                            title: `Project Due: ${project.title}`,
-                            message: `Due in ${daysUntilDue} day(s)`,
-                            dueDate: project.due_date
-                        });
-                        count++;
-                    }
+                    html += createNotificationHTML('project_due', 
+                        `Project Due: ${project.title}`, 
+                        `Due in ${daysUntilDue} day(s)`,
+                        project.due_date);
+                    count++;
                 }
             });
             
-            // Build HTML for each notification item
-            notificationItems.forEach(item => {
-                html += `
-                    <div class="notification-item unread" onclick="dismissNotification('${item.key}')">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div style="flex-grow: 1;">
-                                <div class="notification-title">
-                                    <span class="notification-type type-${item.type}">${item.type === 'task_due' ? 'Task Due' : item.type === 'project_due' ? 'Project Due' : 'Overdue'}</span>
-                                    ${item.title}
-                                </div>
-                                <div class="notification-message">${item.message}</div>
-                                <div class="notification-time">Due: ${formatDate(item.dueDate)}</div>
-                            </div>
-                            <button class="dismiss-btn" onclick="dismissNotification('${item.key}', event)">
-                                ×
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
             if (html === '') {
-                html = '<div style="padding: 20px; text-align: center; color: #888;">No upcoming or overdue items</div>';
+                html = '<div style="padding: 20px; text-align: center; color: #888;">No upcoming or overdue items for this month</div>';
             }
             
             notificationList.innerHTML = html;
             document.getElementById('notificationCount').textContent = count;
         }
 
-        function dismissNotification(itemKey, event = null) {
-            if (event) {
-                event.stopPropagation(); // Prevent the parent div click event
-            }
-            
-            // Add to notified items to prevent showing again
-            notifiedItems.add(itemKey);
-            
-            // Remove the notification from the panel
-            const notificationElement = document.querySelector(`[onclick*="${itemKey}"]`);
-            if (notificationElement) {
-                notificationElement.remove();
-            }
-            
-            // Update count
-            updateNotificationCount();
-            
-            // If no notifications left, show message
-            const notificationList = document.getElementById('notificationList');
-            if (notificationList.children.length === 0) {
-                notificationList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No upcoming or overdue items</div>';
-            }
+        function createNotificationHTML(type, title, message, dueDate) {
+            const typeText = type === 'task_due' ? 'Task Due' : type === 'project_due' ? 'Project Due' : 'Overdue';
+            return `
+                <div class="notification-item unread">
+                    <div style="flex-grow: 1;">
+                        <div class="notification-title">
+                            <span class="notification-type type-${type}">${typeText}</span>
+                            ${title}
+                        </div>
+                        <div class="notification-message">${message}</div>
+                        <div class="notification-time">Due: ${formatDate(dueDate)}</div>
+                    </div>
+                </div>
+            `;
         }
 
-        function clearAllNotifications() {
-            // Mark all visible notifications as dismissed
-            const notificationItems = document.querySelectorAll('.notification-item');
-            notificationItems.forEach(item => {
-                if (item.onclick) {
-                    // Extract the itemKey from the onclick handler
-                    const onclickStr = item.onclick.toString();
-                    const match = onclickStr.match(/dismissNotification\('([^']+)'/);
-                    if (match && match[1]) {
-                        notifiedItems.add(match[1]);
-                    }
-                }
-            });
-            
-            // Clear the notification panel
-            document.getElementById('notificationList').innerHTML = 
-                '<div style="padding: 20px; text-align: center; color: #888;">All notifications cleared</div>';
-            
-            // Update count to 0
-            document.getElementById('notificationCount').textContent = '0';
-            
-            // Hide the panel
-            const panel = document.getElementById('notificationPanel');
-            panel.style.display = 'none';
-            
-            // Show confirmation
-            if (notificationPermission && document.getElementById('enableDesktop')?.checked) {
-                const notification = new Notification("Notifications Cleared", {
-                    body: "All notifications have been dismissed",
-                    icon: '/favicon.ico'
-                });
-                setTimeout(() => notification.close(), 3000);
-            }
+        function refreshNotifications() {
+            updateNotificationPanel();
+            checkForDueItems();
         }
 
         function updateNotificationCount() {
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const remindBeforeDays = parseInt(document.getElementById('remindBefore').value) || 1;
-            const reminderDate = new Date(today);
-            reminderDate.setDate(reminderDate.getDate() + remindBeforeDays);
             
             let count = 0;
             
-            // Count tasks (excluding dismissed ones)
+            // Count tasks (overdue and due this month)
             userTasks.forEach(task => {
                 if (!task.due_date) return;
                 
                 const dueDate = new Date(task.due_date);
                 const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                 
-                if (dueDateOnly < today && task.status !== 'completed') {
-                    // Overdue task
-                    const itemKey = `task_${task.id}_overdue_${today.toDateString()}`;
-                    if (!notifiedItems.has(itemKey)) {
-                        count++;
-                    }
-                } else if (dueDateOnly <= reminderDate && dueDateOnly >= today) {
-                    // Upcoming task
-                    const itemKey = `task_${task.id}_due_${dueDateOnly.toDateString()}`;
-                    if (!notifiedItems.has(itemKey)) {
-                        count++;
-                    }
+                // Count overdue tasks
+                if (dueDateOnly < today && (!task.status || task.status !== 'completed')) {
+                    count++;
+                } 
+                // Count tasks due this month (including today)
+                else if (dueDateOnly.getMonth() === currentMonth && 
+                         dueDateOnly.getFullYear() === currentYear) {
+                    count++;
                 }
             });
             
-            // Count projects (excluding dismissed ones)
+            // Count projects (overdue and due this month)
             userProjects.forEach(project => {
                 if (!project.due_date) return;
                 
                 const dueDate = new Date(project.due_date);
                 const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                 
+                // Count overdue projects
                 if (dueDateOnly < today) {
-                    // Overdue project
-                    const itemKey = `project_${project.id}_overdue_${today.toDateString()}`;
-                    if (!notifiedItems.has(itemKey)) {
-                        count++;
-                    }
-                } else if (dueDateOnly <= reminderDate && dueDateOnly >= today) {
-                    // Upcoming project
-                    const itemKey = `project_${project.id}_due_${dueDateOnly.toDateString()}`;
-                    if (!notifiedItems.has(itemKey)) {
-                        count++;
-                    }
+                    count++;
+                } 
+                // Count projects due this month (including today)
+                else if (dueDateOnly.getMonth() === currentMonth && 
+                         dueDateOnly.getFullYear() === currentYear) {
+                    count++;
                 }
             });
             
@@ -989,46 +606,6 @@ $user_id = $_SESSION['userid'];
                 panel.style.display = 'block';
                 updateNotificationPanel();
             }
-        }
-
-        function loadNotificationSettings() {
-            // Try to load from localStorage
-            const settingsKey = `notification_settings_${userId}`;
-            const savedSettings = localStorage.getItem(settingsKey);
-            
-            if (savedSettings) {
-                const settings = JSON.parse(savedSettings);
-                document.getElementById('enableDesktop').checked = settings.enableDesktop || true;
-                document.getElementById('notifyTaskDue').checked = settings.notifyTaskDue || true;
-                document.getElementById('notifyProjectDue').checked = settings.notifyProjectDue || true;
-                document.getElementById('notifyOverdue').checked = settings.notifyOverdue || true;
-                document.getElementById('remindBefore').value = settings.remindBefore || 1;
-                document.getElementById('notificationInterval').value = settings.notificationInterval || 15;
-            }
-            
-            // Start notification polling with saved interval
-            startNotificationPolling();
-        }
-
-        function updateNotificationSettings() {
-            const settings = {
-                enableDesktop: document.getElementById('enableDesktop').checked,
-                notifyTaskDue: document.getElementById('notifyTaskDue').checked,
-                notifyProjectDue: document.getElementById('notifyProjectDue').checked,
-                notifyOverdue: document.getElementById('notifyOverdue').checked,
-                remindBefore: document.getElementById('remindBefore').value,
-                notificationInterval: document.getElementById('notificationInterval').value
-            };
-            
-            // Save to localStorage
-            const settingsKey = `notification_settings_${userId}`;
-            localStorage.setItem(settingsKey, JSON.stringify(settings));
-            
-            // Restart polling with new interval
-            startNotificationPolling();
-            
-            // Update notification display
-            updateNotificationPanel();
         }
 
         // Format date for display
@@ -1179,7 +756,7 @@ $user_id = $_SESSION['userid'];
                 document.querySelectorAll('.day-cell').forEach(cell => {
                     const eventsContainer = cell.querySelector('.events-container');
                     if (eventsContainer) {
-                        eventsContainer.innerHTML = '<div class="empty-day">Error loading</div>';
+                        eventsContainer.innerHTML = '';
                     }
                 });
             }
@@ -1230,13 +807,7 @@ $user_id = $_SESSION['userid'];
                 });
             }
             
-            // Show empty message for days with no events
-            document.querySelectorAll('.day-cell:not(.other-month)').forEach(cell => {
-                const eventsContainer = cell.querySelector('.events-container');
-                if (eventsContainer && eventsContainer.children.length === 0) {
-                    eventsContainer.innerHTML = '<div class="empty-day">No events</div>';
-                }
-            });
+            // Removed the "No events" message - boxes will just be empty
         }
 
         function createEventElement(item, type) {
@@ -1246,18 +817,21 @@ $user_id = $_SESSION['userid'];
             // Add priority class
             if (item.priority === 'high') {
                 eventDiv.classList.add('priority-high');
-                eventDiv.style.background = type === 'task' ? '#fff3cd' : '#f8d7da';
+                // High priority items get the high priority color (yellow) from legend
+                eventDiv.style.background = '#fff3cd';
+                eventDiv.style.borderLeftColor = '#ffc107';
             } else if (item.priority === 'low') {
                 eventDiv.classList.add('priority-low');
             }
             
-            // Check if overdue
+            // Check if overdue (overrides high priority color)
             const today = new Date();
             const dueDate = new Date(item.due_date);
             const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
             const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             
-            if (dueDateOnly < todayOnly && (type === 'task' ? item.status !== 'completed' : true)) {
+            if (dueDateOnly < todayOnly && (type === 'task' ? (!item.status || item.status !== 'completed') : true)) {
+                // Overdue items get the overdue color (red) from legend
                 eventDiv.style.background = '#f8d7da';
                 eventDiv.style.borderLeftColor = '#dc3545';
             }

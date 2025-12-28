@@ -18,6 +18,7 @@ try {
 
     // //Recipients
     $mail->setFrom('schoolusecfa@gmail.com', 'TaskBoard');
+    $mail->isHTML(true);
 } catch (Exception $e) {
     echo "Error: {$mail->ErrorInfo}";
 }

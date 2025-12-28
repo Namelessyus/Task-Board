@@ -5,7 +5,7 @@ error_reporting(E_ALL);
 
 $host = "localhost";
 $username = "root";
-$password = "asdf";
+$password = "1234";
 $db = "taskboard_db";
 $port = 3306;
 

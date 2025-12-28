@@ -56,7 +56,7 @@ $tasksQuery = "
     WHERE (t.assigned_to = ? OR t.created_by = ?)
     AND t.is_deleted = 0
     AND t.due_date IS NOT NULL
-    AND p.is_deleted = 0
+    AND (p.is_deleted = 0 OR p.id IS NULL)
     ORDER BY t.due_date, 
     CASE t.priority 
         WHEN 'high' THEN 1 
