@@ -196,9 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         </form>
         
         <div class="form-links">
-            <a href="forgot_password.php" class="link">
-                <i class="fas fa-key"></i> Forgot Password?
-            </a>
             <a href="recover_account.php" class="link recover-link">
                 <i class="fas fa-user-slash"></i> Recover Account
             </a>
