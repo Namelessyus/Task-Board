@@ -1184,7 +1184,7 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 return false;
             }
             
-            return confirm('Are you sure you want to deactivate your account?\n\nYour account will be deactivated immediately. You can contact support within 30 days to restore it.');
+            return confirm('Are you sure you want to deactivate your account?\n\nYour account will be deactivated immediately.');
         }
         
         // Restore confirmation

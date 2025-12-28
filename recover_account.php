@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="container">
         <h2><i class="fas fa-user-clock"></i> Recover Account</h2>
-        <p>Enter your email to restore a deactivated account within 30 days of deletion.</p>
+        <p>Enter your email to restore a deactivated account.</p>
         
         <?php if (!empty($success)): ?>
             <div class="success"><?php echo $success; ?></div>
