@@ -98,6 +98,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
     }
 }
 
+// Handle project restoration (for supervisors only)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['restore_project'])) {
+    $project_id = intval($_POST['project_id']);
+    
+    // Check if user is the supervisor of this project
+    $check_sql = "SELECT id FROM projects WHERE id = '$project_id' AND supervisor_id = '$user_id'";
+    $check_result = mysqli_query($conn, $check_sql);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $restore_sql = "UPDATE projects SET is_deleted = 0, deleted_at = NULL WHERE id = '$project_id'";
+        
+        if (mysqli_query($conn, $restore_sql)) {
+            $success = "Project restored successfully!";
+        } else {
+            $error = "Error restoring project: " . mysqli_error($conn);
+        }
+    } else {
+        $error = "You are not authorized to restore this project.";
+    }
+}
+
 // Get user statistics
 $stats_sql = "SELECT 
     COUNT(DISTINCT p.id) as projects_created,
@@ -152,6 +173,14 @@ $stats['projects_created'] = $projects_created;
 $stats['projects_joined'] = $projects_joined;
 $stats['tasks_assigned'] = $tasks_assigned;
 $stats['tasks_completed'] = $tasks_completed;
+
+// Get soft-deleted projects for this supervisor
+$deleted_projects_sql = "SELECT * FROM projects WHERE supervisor_id = '$user_id' AND is_deleted = 1 ORDER BY deleted_at DESC";
+$deleted_projects_result = mysqli_query($conn, $deleted_projects_sql);
+$deleted_projects = [];
+while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
+    $deleted_projects[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -659,6 +688,94 @@ $stats['tasks_completed'] = $tasks_completed;
             border: 2px solid #bae6fd;
         }
         
+        /* Restore Section Styles - SIMPLIFIED */
+        .restore-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .restore-table th, .restore-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .restore-table th {
+            background: #764BA2;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .restore-table tr:hover {
+            background: #f7fafc;
+        }
+        
+        .restore-table td:last-child {
+            text-align: center;
+        }
+        
+        .btn-restore {
+            background: #48bb78;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-restore:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 2px dashed #e2e8f0;
+            margin-top: 20px;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #cbd5e1;
+        }
+        
+        .info-card {
+            background: #e0f2fe;
+            border: 2px solid #bae6fd;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .info-card h4 {
+            color: #0369a1;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info-card p {
+            color: #0c4a6e;
+            margin: 0;
+            line-height: 1.6;
+        }
+        
         @media (max-width: 1024px) {
             .account-container {
                 flex-direction: column;
@@ -690,6 +807,11 @@ $stats['tasks_completed'] = $tasks_completed;
                 min-width: 120px;
                 text-align: center;
                 justify-content: center;
+            }
+            
+            .restore-table {
+                display: block;
+                overflow-x: auto;
             }
         }
         
@@ -726,6 +848,11 @@ $stats['tasks_completed'] = $tasks_completed;
             
             .tab-navigation {
                 flex-direction: column;
+            }
+            
+            .restore-table th, .restore-table td {
+                padding: 10px;
+                font-size: 14px;
             }
         }
     </style>
@@ -770,6 +897,9 @@ $stats['tasks_completed'] = $tasks_completed;
                 </button>
                 <button class="tab-btn <?php echo $tab == 'stats' ? 'active' : ''; ?>" onclick="showTab('stats')">
                     <i class="fas fa-chart-bar"></i> Stats
+                </button>
+                <button class="tab-btn <?php echo $tab == 'restore' ? 'active' : ''; ?>" onclick="showTab('restore')">
+                    <i class="fas fa-trash-restore"></i> Restore Projects
                 </button>
             </div>
             
@@ -892,16 +1022,6 @@ $stats['tasks_completed'] = $tasks_completed;
                         <p><strong>IP Address:</strong> <?php echo $_SERVER['REMOTE_ADDR']; ?></p>
                     </div>
                 </div>
-                
-                <div class="account-card">
-                    <h2><i class="fas fa-question-circle"></i> Forgot Password?</h2>
-                    <p>If you've forgotten your password, you can reset it using the link below.</p>
-                    <div style="text-align: center; margin-top: 15px;">
-                        <a href="forgot_password.php" class="btn-primary" style="display: inline-block;">
-                            <i class="fas fa-key"></i> Reset Password
-                        </a>
-                    </div>
-                </div>
             </div>
 
              <!-- Stats Tab -->
@@ -932,7 +1052,51 @@ $stats['tasks_completed'] = $tasks_completed;
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Restore Tab (Only Projects) -->
+            <div class="tab-content <?php echo $tab == 'restore' ? 'active' : ''; ?>" id="restore-tab">
                 
+                <!-- Deleted Projects Section -->
+                <div class="account-card">
+                    <h2 class="section-title"><i class="fas fa-project-diagram"></i> Deleted Projects</h2>
+                    <p class="section-subtitle">Projects you supervise that have been deleted</p>
+                    
+                    <?php if (!empty($deleted_projects)): ?>
+                        <table class="restore-table">
+                            <thead>
+                                <tr>
+                                    <th>Project Title</th>
+                                    <th>Description</th>
+                                    <th>Deleted On</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($deleted_projects as $project): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($project['title']); ?></strong></td>
+                                        <td><?php echo htmlspecialchars(substr($project['description'] ?? 'No description', 0, 50)) . (strlen($project['description'] ?? '') > 50 ? '...' : ''); ?></td>
+                                        <td><?php echo $project['deleted_at'] ? date('M j, Y H:i', strtotime($project['deleted_at'])) : 'Unknown'; ?></td>
+                                        <td>
+                                            <form method="POST" action="" style="display: inline;">
+                                                <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
+                                                <button type="submit" name="restore_project" class="btn-restore" onclick="return confirmRestore('project')">
+                                                    <i class="fas fa-undo"></i> Restore
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <h3>No Deleted Projects</h3>
+                            <p>You don't have any deleted projects to restore.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -1022,6 +1186,11 @@ $stats['tasks_completed'] = $tasks_completed;
             }
             
             return confirm('Are you sure you want to deactivate your account?\n\nYour account will be deactivated immediately. You can contact support within 30 days to restore it.');
+        }
+        
+        // Restore confirmation
+        function confirmRestore(type) {
+            return confirm(`Are you sure you want to restore this project?\n\nThe project and all its associated tasks will be restored.`);
         }
         
         // Real-time username validation

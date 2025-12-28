@@ -201,7 +201,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             </a>
         </div>
         
-        <!-- FIXED: Changed signup.html to signup.php -->
         <div class="form-footer">
             Don't have an account? <a href="signup.php">Sign Up</a>
         </div>
