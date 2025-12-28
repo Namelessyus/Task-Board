@@ -2252,8 +2252,6 @@ button[type="submit"]:hover {
             <h3 style="color: #2d3748; margin-bottom: 10px;">Delete Project?</h3>
             <p style="color: #718096; margin-bottom: 20px;">
                 Are you sure you want to delete the project "<strong><?php echo htmlspecialchars($project['title']); ?></strong>"? 
-                <br><br>
-                This will <strong>soft delete</strong> the project and all its tasks. They will be hidden from view but can be restored from the database if needed.
             </p>
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button onclick="hideDeleteConfirmation()" style="padding: 10px 20px; border: 1px solid #cbd5e0; background: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500;">

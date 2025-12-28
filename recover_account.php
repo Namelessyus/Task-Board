@@ -193,11 +193,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <button type="submit">Restore Account</button>
         </form>
         
-        <div class="info-box">
-            <strong>Note:</strong> Accounts can only be restored within 30 days of deactivation.
-            After 30 days, accounts are permanently deleted.
-        </div>
-        
         <a href="login.php" class="back-link">← Back to Login</a>
     </div>
 </body>

@@ -949,8 +949,7 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 <div class="account-card danger-zone">
                     <h3><i class="fas fa-exclamation-triangle"></i> To Deactivate Account</h3>
                     <p style="color: #7f1d1d; margin-bottom: 20px; line-height: 1.6;">
-                        This will deactivate your account. Your data will be kept for 30 days before permanent deletion.
-                        You can restore your account during this period by contacting support.
+                        This will deactivate your account. You can recover your account from the login page.
                     </p>
                     
                     <form method="POST" action="" id="deleteForm" onsubmit="return confirmDelete()">
