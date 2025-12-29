@@ -107,12 +107,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['restore_project'])) {
     $check_result = mysqli_query($conn, $check_sql);
     
     if (mysqli_num_rows($check_result) > 0) {
-        $restore_sql = "UPDATE projects SET is_deleted = 0, deleted_at = NULL WHERE id = '$project_id'";
+        // Start transaction to ensure both operations succeed
+        mysqli_begin_transaction($conn);
         
-        if (mysqli_query($conn, $restore_sql)) {
-            $success = "Project restored successfully!";
-        } else {
-            $error = "Error restoring project: " . mysqli_error($conn);
+        try {
+            // 1. Restore the project
+            $restore_project_sql = "UPDATE projects SET is_deleted = 0, deleted_at = NULL WHERE id = '$project_id'";
+            
+            if (!mysqli_query($conn, $restore_project_sql)) {
+                throw new Exception("Error restoring project: " . mysqli_error($conn));
+            }
+            
+            // 2. Restore all tasks belonging to this project
+            $restore_tasks_sql = "UPDATE tasks SET is_deleted = 0, deleted_at = NULL WHERE project_id = '$project_id' AND is_deleted = 1";
+            
+            if (!mysqli_query($conn, $restore_tasks_sql)) {
+                throw new Exception("Error restoring tasks: " . mysqli_error($conn));
+            }
+            
+            // 3. Get count of restored tasks for success message
+            $tasks_count_sql = "SELECT ROW_COUNT() as tasks_restored";
+            $tasks_count_result = mysqli_query($conn, $tasks_count_sql);
+            $tasks_count = mysqli_fetch_assoc($tasks_count_result)['tasks_restored'];
+            
+            // Commit transaction
+            mysqli_commit($conn);
+            
+            $success = "Project restored successfully! ";
+            if ($tasks_count > 0) {
+                $success .= $tasks_count . " task(s) were also restored.";
+            } else {
+                $success .= "No tasks found to restore.";
+            }
+            
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            mysqli_rollback($conn);
+            $error = $e->getMessage();
         }
     } else {
         $error = "You are not authorized to restore this project.";
@@ -688,7 +719,7 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
             border: 2px solid #bae6fd;
         }
         
-        /* Restore Section Styles - SIMPLIFIED */
+        /* Restore Section Styles */
         .restore-table {
             width: 100%;
             border-collapse: collapse;
@@ -774,6 +805,17 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
             color: #0c4a6e;
             margin: 0;
             line-height: 1.6;
+        }
+        
+        .task-count {
+            display: inline-block;
+            background: #d1fae5;
+            color: #065f46;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
         }
         
         @media (max-width: 1024px) {
@@ -949,7 +991,8 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 <div class="account-card danger-zone">
                     <h3><i class="fas fa-exclamation-triangle"></i> To Deactivate Account</h3>
                     <p style="color: #7f1d1d; margin-bottom: 20px; line-height: 1.6;">
-                        This will deactivate your account. You can recover your account from the login page.
+                        This will deactivate your account. Your data will be kept for 30 days before permanent deletion.
+                        You can restore your account during this period by contacting support.
                     </p>
                     
                     <form method="POST" action="" id="deleteForm" onsubmit="return confirmDelete()">
@@ -1021,6 +1064,16 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                         <p><strong>IP Address:</strong> <?php echo $_SERVER['REMOTE_ADDR']; ?></p>
                     </div>
                 </div>
+                
+                <div class="account-card">
+                    <h2><i class="fas fa-question-circle"></i> Forgot Password?</h2>
+                    <p>If you've forgotten your password, you can reset it using the link below.</p>
+                    <div style="text-align: center; margin-top: 15px;">
+                        <a href="forgot_password.php" class="btn-primary" style="display: inline-block;">
+                            <i class="fas fa-key"></i> Reset Password
+                        </a>
+                    </div>
+                </div>
             </div>
 
              <!-- Stats Tab -->
@@ -1053,8 +1106,12 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 </div>
             </div>
 
-            <!-- Restore Tab (Only Projects) -->
+            <!-- Restore Tab -->
             <div class="tab-content <?php echo $tab == 'restore' ? 'active' : ''; ?>" id="restore-tab">
+                <div class="info-card">
+                    <h4><i class="fas fa-info-circle"></i> About Project Restoration</h4>
+                    <p>When you restore a project, all its associated tasks will also be automatically restored. Only projects you supervise can be restored. Deleted projects are kept for 30 days before permanent deletion.</p>
+                </div>
                 
                 <!-- Deleted Projects Section -->
                 <div class="account-card">
@@ -1074,13 +1131,23 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                             <tbody>
                                 <?php foreach ($deleted_projects as $project): ?>
                                     <tr>
-                                        <td><strong><?php echo htmlspecialchars($project['title']); ?></strong></td>
+                                        <td>
+                                            <strong><?php echo htmlspecialchars($project['title']); ?></strong>
+                                            <?php 
+                                            // Get task count for this project
+                                            $task_count_sql = "SELECT COUNT(*) as task_count FROM tasks WHERE project_id = '{$project['id']}' AND is_deleted = 1";
+                                            $task_count_result = mysqli_query($conn, $task_count_sql);
+                                            $task_count = mysqli_fetch_assoc($task_count_result)['task_count'];
+                                            if ($task_count > 0): ?>
+                                                <span class="task-count" title="Tasks to be restored"><?php echo $task_count; ?> task(s)</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo htmlspecialchars(substr($project['description'] ?? 'No description', 0, 50)) . (strlen($project['description'] ?? '') > 50 ? '...' : ''); ?></td>
                                         <td><?php echo $project['deleted_at'] ? date('M j, Y H:i', strtotime($project['deleted_at'])) : 'Unknown'; ?></td>
                                         <td>
                                             <form method="POST" action="" style="display: inline;">
                                                 <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
-                                                <button type="submit" name="restore_project" class="btn-restore" onclick="return confirmRestore('project')">
+                                                <button type="submit" name="restore_project" class="btn-restore" onclick="return confirmRestore()">
                                                     <i class="fas fa-undo"></i> Restore
                                                 </button>
                                             </form>
@@ -1184,12 +1251,12 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 return false;
             }
             
-            return confirm('Are you sure you want to deactivate your account?\n\nYour account will be deactivated immediately.');
+            return confirm('Are you sure you want to deactivate your account?\n\nYour account will be deactivated immediately. You can contact support within 30 days to restore it.');
         }
         
         // Restore confirmation
-        function confirmRestore(type) {
-            return confirm(`Are you sure you want to restore this project?\n\nThe project and all its associated tasks will be restored.`);
+        function confirmRestore() {
+            return confirm('Are you sure you want to restore this project?\n\nThe project and all its associated tasks will be restored.');
         }
         
         // Real-time username validation
