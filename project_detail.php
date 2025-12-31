@@ -1476,8 +1476,7 @@ button[type="submit"]:hover {
                 <!-- Progress Bar - FOURTH SECTION -->
                 <div class="progress-section">
                     <div class="progress-text">
-                        <span>Project Progress</span> 
-                        <span><?php echo $progress_percentage; ?>% Complete</span>
+                        <span>Project Progress: <?php echo $progress_percentage;?>% Complete</span> 
                     </div>
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: <?php echo $progress_percentage; ?>%"></div>
