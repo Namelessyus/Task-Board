@@ -150,6 +150,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['restore_project'])) {
     }
 }
 
+// Handle task restoration
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['restore_task'])) {
+    $task_id = intval($_POST['task_id']);
+    
+    // Check if user is authorized to restore this task (either creator, assignee, or project supervisor)
+    $check_sql = "SELECT t.*, p.supervisor_id 
+                  FROM tasks t 
+                  JOIN projects p ON t.project_id = p.id 
+                  WHERE t.id = '$task_id' 
+                  AND (t.created_by = '$user_id' 
+                       OR t.assigned_to = '$user_id' 
+                       OR p.supervisor_id = '$user_id')";
+    $check_result = mysqli_query($conn, $check_sql);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $task_data = mysqli_fetch_assoc($check_result);
+        
+        // Check if the parent project is deleted
+        $project_sql = "SELECT is_deleted FROM projects WHERE id = '{$task_data['project_id']}'";
+        $project_result = mysqli_query($conn, $project_sql);
+        $project = mysqli_fetch_assoc($project_result);
+        
+        if ($project['is_deleted'] == 1) {
+            $error = "Cannot restore task because its parent project is deleted. Please restore the project first.";
+        } else {
+            // Restore the task
+            $restore_sql = "UPDATE tasks SET is_deleted = 0, deleted_at = NULL WHERE id = '$task_id'";
+            
+            if (mysqli_query($conn, $restore_sql)) {
+                $success = "Task '{$task_data['title']}' restored successfully!";
+            } else {
+                $error = "Error restoring task: " . mysqli_error($conn);
+            }
+        }
+    } else {
+        $error = "You are not authorized to restore this task.";
+    }
+}
+
 // Get user statistics
 $stats_sql = "SELECT 
     COUNT(DISTINCT p.id) as projects_created,
@@ -211,6 +250,22 @@ $deleted_projects_result = mysqli_query($conn, $deleted_projects_sql);
 $deleted_projects = [];
 while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
     $deleted_projects[] = $row;
+}
+
+// Get soft-deleted tasks that the user can restore
+$deleted_tasks_sql = "SELECT t.*, p.title as project_title, p.supervisor_id, p.is_deleted as project_deleted
+                      FROM tasks t 
+                      JOIN projects p ON t.project_id = p.id 
+                      WHERE t.is_deleted = 1 
+                      AND p.is_deleted = 0  -- Only show tasks from non-deleted projects
+                      AND (t.created_by = '$user_id' 
+                           OR t.assigned_to = '$user_id' 
+                           OR p.supervisor_id = '$user_id')
+                      ORDER BY t.deleted_at DESC";
+$deleted_tasks_result = mysqli_query($conn, $deleted_tasks_sql);
+$deleted_tasks = [];
+while ($row = mysqli_fetch_assoc($deleted_tasks_result)) {
+    $deleted_tasks[] = $row;
 }
 ?>
 <!DOCTYPE html>
@@ -769,6 +824,26 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
             transform: translateY(-2px);
         }
         
+        .btn-task-restore {
+            background: #4299e1;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-task-restore:hover {
+            background: #3182ce;
+            transform: translateY(-2px);
+        }
+        
         .empty-state {
             text-align: center;
             padding: 40px;
@@ -816,6 +891,85 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
             font-size: 12px;
             font-weight: 500;
             margin-left: 8px;
+        }
+        
+        .task-status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .task-status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .task-status-in-progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .task-status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-in-progress { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        
+        .task-project-info {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 5px;
+        }
+        
+        .restore-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+        }
+        
+        .restore-tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f1f5f9;
+            color: #64748b;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .restore-tab-btn:hover {
+            background: #e2e8f0;
+        }
+        
+        .restore-tab-btn.active {
+            background: #764BA2;
+            color: white;
+        }
+        
+        .restore-content {
+            display: none;
+        }
+        
+        .restore-content.active {
+            display: block;
         }
         
         @media (max-width: 1024px) {
@@ -896,6 +1050,15 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 padding: 10px;
                 font-size: 14px;
             }
+            
+            .restore-tabs {
+                flex-direction: column;
+            }
+            
+            .restore-tab-btn {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -941,7 +1104,7 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                     <i class="fas fa-chart-bar"></i> Stats
                 </button>
                 <button class="tab-btn <?php echo $tab == 'restore' ? 'active' : ''; ?>" onclick="showTab('restore')">
-                    <i class="fas fa-trash-restore"></i> Restore Projects
+                    <i class="fas fa-trash-restore"></i> Restore
                 </button>
             </div>
             
@@ -991,8 +1154,7 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                 <div class="account-card danger-zone">
                     <h3><i class="fas fa-exclamation-triangle"></i> To Deactivate Account</h3>
                     <p style="color: #7f1d1d; margin-bottom: 20px; line-height: 1.6;">
-                        This will deactivate your account. Your data will be kept for 30 days before permanent deletion.
-                        You can restore your account during this period by contacting support.
+                        This will deactivate your account.
                     </p>
                     
                     <form method="POST" action="" id="deleteForm" onsubmit="return confirmDelete()">
@@ -1064,16 +1226,6 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
                         <p><strong>IP Address:</strong> <?php echo $_SERVER['REMOTE_ADDR']; ?></p>
                     </div>
                 </div>
-                
-                <div class="account-card">
-                    <h2><i class="fas fa-question-circle"></i> Forgot Password?</h2>
-                    <p>If you've forgotten your password, you can reset it using the link below.</p>
-                    <div style="text-align: center; margin-top: 15px;">
-                        <a href="forgot_password.php" class="btn-primary" style="display: inline-block;">
-                            <i class="fas fa-key"></i> Reset Password
-                        </a>
-                    </div>
-                </div>
             </div>
 
              <!-- Stats Tab -->
@@ -1108,61 +1260,131 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
 
             <!-- Restore Tab -->
             <div class="tab-content <?php echo $tab == 'restore' ? 'active' : ''; ?>" id="restore-tab">
-                <div class="info-card">
-                    <h4><i class="fas fa-info-circle"></i> About Project Restoration</h4>
-                    <p>When you restore a project, all its associated tasks will also be automatically restored. Only projects you supervise can be restored. Deleted projects are kept for 30 days before permanent deletion.</p>
-                </div>
-                
-                <!-- Deleted Projects Section -->
                 <div class="account-card">
-                    <h2 class="section-title"><i class="fas fa-project-diagram"></i> Deleted Projects</h2>
-                    <p class="section-subtitle">Projects you supervise that have been deleted</p>
+                    <h2 class="section-title"><i class="fas fa-trash-restore"></i> Restore Deleted Items</h2>
+                    <p class="section-subtitle">Restore projects and tasks that have been deleted</p>
                     
-                    <?php if (!empty($deleted_projects)): ?>
-                        <table class="restore-table">
-                            <thead>
-                                <tr>
-                                    <th>Project Title</th>
-                                    <th>Description</th>
-                                    <th>Deleted On</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($deleted_projects as $project): ?>
+                    <div class="restore-tabs">
+                        <button class="restore-tab-btn active" onclick="showRestoreTab('projects')">
+                            <i class="fas fa-project-diagram"></i> Projects
+                        </button>
+                        <button class="restore-tab-btn" onclick="showRestoreTab('tasks')">
+                            <i class="fas fa-tasks"></i> Tasks
+                        </button>
+                    </div>
+                    
+                    <!-- Projects Tab Content -->
+                    <div class="restore-content active" id="projects-tab">
+                        <h3><i class="fas fa-project-diagram"></i> Deleted Projects</h3>
+                        <p>Projects you supervise that have been deleted</p>
+                        
+                        <?php if (!empty($deleted_projects)): ?>
+                            <table class="restore-table">
+                                <thead>
                                     <tr>
-                                        <td>
-                                            <strong><?php echo htmlspecialchars($project['title']); ?></strong>
-                                            <?php 
-                                            // Get task count for this project
-                                            $task_count_sql = "SELECT COUNT(*) as task_count FROM tasks WHERE project_id = '{$project['id']}' AND is_deleted = 1";
-                                            $task_count_result = mysqli_query($conn, $task_count_sql);
-                                            $task_count = mysqli_fetch_assoc($task_count_result)['task_count'];
-                                            if ($task_count > 0): ?>
-                                                <span class="task-count" title="Tasks to be restored"><?php echo $task_count; ?> task(s)</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td><?php echo htmlspecialchars(substr($project['description'] ?? 'No description', 0, 50)) . (strlen($project['description'] ?? '') > 50 ? '...' : ''); ?></td>
-                                        <td><?php echo $project['deleted_at'] ? date('M j, Y H:i', strtotime($project['deleted_at'])) : 'Unknown'; ?></td>
-                                        <td>
-                                            <form method="POST" action="" style="display: inline;">
-                                                <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
-                                                <button type="submit" name="restore_project" class="btn-restore" onclick="return confirmRestore()">
-                                                    <i class="fas fa-undo"></i> Restore
-                                                </button>
-                                            </form>
-                                        </td>
+                                        <th>Project Title</th>
+                                        <th>Description</th>
+                                        <th>Deleted On</th>
+                                        <th>Actions</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <i class="fas fa-folder-open"></i>
-                            <h3>No Deleted Projects</h3>
-                            <p>You don't have any deleted projects to restore.</p>
-                        </div>
-                    <?php endif; ?>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($deleted_projects as $project): ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?php echo htmlspecialchars($project['title']); ?></strong>
+                                                <?php 
+                                                // Get task count for this project
+                                                $task_count_sql = "SELECT COUNT(*) as task_count FROM tasks WHERE project_id = '{$project['id']}' AND is_deleted = 1";
+                                                $task_count_result = mysqli_query($conn, $task_count_sql);
+                                                $task_count = mysqli_fetch_assoc($task_count_result)['task_count'];
+                                                if ($task_count > 0): ?>
+                                                    <span class="task-count" title="Tasks to be restored"><?php echo $task_count; ?> task(s)</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars(substr($project['description'] ?? 'No description', 0, 50)) . (strlen($project['description'] ?? '') > 50 ? '...' : ''); ?></td>
+                                            <td><?php echo $project['deleted_at'] ? date('M j, Y H:i', strtotime($project['deleted_at'])) : 'Unknown'; ?></td>
+                                            <td>
+                                                <form method="POST" action="" style="display: inline;">
+                                                    <input type="hidden" name="project_id" value="<?php echo $project['id']; ?>">
+                                                    <button type="submit" name="restore_project" class="btn-restore" onclick="return confirmRestore('project')">
+                                                        <i class="fas fa-undo"></i> Restore
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-folder-open"></i>
+                                <h3>No Deleted Projects</h3>
+                                <p>You don't have any deleted projects to restore.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Tasks Tab Content -->
+                    <div class="restore-content" id="tasks-tab">
+                        <h3><i class="fas fa-tasks"></i> Deleted Tasks</h3>
+                        <p>Tasks that have been deleted but their parent projects are still active</p>
+                        
+                        <?php if (!empty($deleted_tasks)): ?>
+                            <table class="restore-table">
+                                <thead>
+                                    <tr>
+                                        <th>Task Title</th>
+                                        <th>Project</th>
+                                        <th>Status</th>
+                                        <th>Deleted On</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($deleted_tasks as $task): 
+                                        // Determine status class
+                                        $status_class = '';
+                                        switch ($task['status']) {
+                                            case 'pending': $status_class = 'status-pending'; break;
+                                            case 'in-progress': $status_class = 'status-in-progress'; break;
+                                            case 'completed': $status_class = 'status-completed'; break;
+                                        }
+                                    ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?php echo htmlspecialchars($task['title']); ?></strong>
+                                                <div class="task-project-info">
+                                                    Priority: <?php echo ucfirst($task['priority'] ?? 'medium'); ?>
+                                                </div>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($task['project_title']); ?></td>
+                                            <td>
+                                                <span class="status-badge <?php echo $status_class; ?>">
+                                                    <?php echo ucfirst($task['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td><?php echo $task['deleted_at'] ? date('M j, Y H:i', strtotime($task['deleted_at'])) : 'Unknown'; ?></td>
+                                            <td>
+                                                <form method="POST" action="" style="display: inline;">
+                                                    <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                                    <button type="submit" name="restore_task" class="btn-task-restore" onclick="return confirmRestore('task')">
+                                                        <i class="fas fa-undo"></i> Restore
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-tasks"></i>
+                                <h3>No Deleted Tasks</h3>
+                                <p>You don't have any deleted tasks to restore.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1213,6 +1435,21 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
             }
         }
         
+        // Restore tab switching
+        function showRestoreTab(tabName) {
+            // Update active restore tab button
+            document.querySelectorAll('.restore-tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Show active restore tab content
+            document.querySelectorAll('.restore-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+        
         // Validation functions
         function validateProfile() {
             const username = document.getElementById('username').value;
@@ -1255,8 +1492,13 @@ while ($row = mysqli_fetch_assoc($deleted_projects_result)) {
         }
         
         // Restore confirmation
-        function confirmRestore() {
-            return confirm('Are you sure you want to restore this project?\n\nThe project and all its associated tasks will be restored.');
+        function confirmRestore(type) {
+            if (type === 'project') {
+                return confirm('Are you sure you want to restore this project?\n\nThe project and all its associated tasks will be restored.');
+            } else if (type === 'task') {
+                return confirm('Are you sure you want to restore this task?');
+            }
+            return true;
         }
         
         // Real-time username validation
