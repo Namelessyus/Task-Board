@@ -55,7 +55,72 @@ if ($manage_mode && !$is_supervisor) {
     exit();
 }
 
-// Handle task creation (only for supervisors) - WITH MULTIPLE ASSIGNMENTS
+// // Handle task creation (only for supervisors) - WITH MULTIPLE ASSIGNMENTS
+// if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_supervisor) {
+//     $task_title = mysqli_real_escape_string($conn, $_POST['task_title']);
+//     $task_description = mysqli_real_escape_string($conn, $_POST['task_description']);
+//     $task_priority = $_POST['task_priority'];
+    
+//     // Get selected assignees (array of user IDs)
+//     $assignees = isset($_POST['assignees']) ? $_POST['assignees'] : array();
+    
+//     // Handle due_date properly with validation
+//     $task_due_date = $_POST['task_due_date'];
+//     if (empty($task_due_date)) {
+//         $task_due_date = "NULL";
+//     } else {
+//         // Validate due date - must be today or in the future
+//         $today = date('Y-m-d');
+//         if ($task_due_date < $today) {
+//             $error = "Task due date cannot be in the past! Please select today or a future date.";
+//         } else {
+//             $task_due_date = "'$task_due_date'";
+//         }
+//     }
+    
+//     if (empty($error)) {
+//         if (!empty($task_title)) {
+//             // Insert the task (assigned_to is NULL since we're using multiple assignments)
+//             $task_sql = "INSERT INTO tasks (project_id, title, description, assigned_to, priority, due_date, created_by) 
+//                          VALUES ('$project_id', '$task_title', '$task_description', NULL, '$task_priority', $task_due_date, '$user_id')";
+            
+//             if (mysqli_query($conn, $task_sql)) {
+//                 $task_id = mysqli_insert_id($conn); // Get the ID of the newly created task
+                
+//                 // Insert assignments for each selected user
+//                 if (!empty($assignees) && is_array($assignees)) {
+//                     foreach ($assignees as $assignee_id) {
+//                         $assignee_id = intval($assignee_id);
+//                         if ($assignee_id > 0) {
+//                             $assign_sql = "INSERT INTO task_assignments (task_id, user_id) 
+//                                           VALUES ('$task_id', '$assignee_id')";
+//                             mysqli_query($conn, $assign_sql);
+
+//                         }
+//                     }
+//                 }
+                
+//                 // Log the task creation in progress tracking
+//                 $log_sql = "INSERT INTO task_progress (task_id, user_id, progress_note) 
+//                            VALUES ('$task_id', '$user_id', 'Task created')";
+//                 mysqli_query($conn, $log_sql);
+                
+//                 $success = "Task created successfully!";
+//                 // Refresh to show the new task
+//                 header("Location: project_detail.php?id=$project_id&manage=true");
+//                 include 'message.php';
+                
+//                 exit();
+//             } else {
+//                 $error = "Error creating task: " . mysqli_error($conn);
+//             }
+//         } else {
+//             $error = "Task title is required!";
+//         }
+//     }
+// }
+
+// Handle task creation (only for supervisors) - WITH MULTIPLE ASSIGNMENTS AND EMAIL NOTIFICATION
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_supervisor) {
     $task_title = mysqli_real_escape_string($conn, $_POST['task_title']);
     $task_description = mysqli_real_escape_string($conn, $_POST['task_description']);
@@ -87,15 +152,132 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
             if (mysqli_query($conn, $task_sql)) {
                 $task_id = mysqli_insert_id($conn); // Get the ID of the newly created task
                 
+                // Store assignee emails for sending notifications
+                $assignee_emails = array();
+                
                 // Insert assignments for each selected user
                 if (!empty($assignees) && is_array($assignees)) {
                     foreach ($assignees as $assignee_id) {
                         $assignee_id = intval($assignee_id);
                         if ($assignee_id > 0) {
+                            // Get user email before inserting assignment
+                            $user_sql = "SELECT email, username FROM users WHERE id = '$assignee_id'";
+                            $user_result = mysqli_query($conn, $user_sql);
+                            
+                            if ($user_result && mysqli_num_rows($user_result) > 0) {
+                                $user_data = mysqli_fetch_assoc($user_result);
+                                $assignee_emails[] = array(
+                                    'email' => $user_data['email'],
+                                    'username' => $user_data['username']
+                                );
+                            }
+                            
                             $assign_sql = "INSERT INTO task_assignments (task_id, user_id) 
                                           VALUES ('$task_id', '$assignee_id')";
                             mysqli_query($conn, $assign_sql);
                         }
+                    }
+                }
+                
+                // Send email notifications to assignees
+                if (!empty($assignee_emails)) {
+                    try {
+                       include 'message.php';
+                        // Send email to each assignee
+                        foreach ($assignee_emails as $assignee) {
+                            $mail->addAddress($assignee['email'], $assignee['username']);
+                            
+                            // Email content
+                            $mail->Subject = 'New Task Assigned: ' . htmlspecialchars($task_title);
+                            
+                            $due_date_display = ($task_due_date != "NULL") ? 
+                                date('F j, Y', strtotime($_POST['task_due_date'])) : 'No due date';
+                            
+                            $mail->Body = '
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <style>
+                                        body { font-family: Arial, sans-serif; line-height: 1.6; }
+                                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                                        .header { background: #764BA2; color: white; padding: 20px; text-align: center; }
+                                        .content { background: #f9f9f9; padding: 20px; }
+                                        .task-details { background: white; padding: 15px; border-left: 4px solid #764BA2; margin: 15px 0; }
+                                        .priority-high { color: #e53e3e; font-weight: bold; }
+                                        .priority-medium { color: #d69e2e; font-weight: bold; }
+                                        .priority-low { color: #38a169; font-weight: bold; }
+                                        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                                        .btn { display: inline-block; background: #764BA2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="container">
+                                        <div class="header">
+                                            <h1>New Task Assigned</h1>
+                                        </div>
+                                        <div class="content">
+                                            <p>Hello ' . htmlspecialchars($assignee['username']) . ',</p>
+                                            <p>You have been assigned a new task in the project: <strong>' . htmlspecialchars($project['title']) . '</strong></p>
+                                            
+                                            <div class="task-details">
+                                                <h3>Task Details:</h3>
+                                                <p><strong>Task:</strong> ' . htmlspecialchars($task_title) . '</p>';
+                                            
+                                            if (!empty($task_description)) {
+                                                $mail->Body .= '<p><strong>Description:</strong> ' . nl2br(htmlspecialchars($task_description)) . '</p>';
+                                            }
+                                            
+                                            $priority_class = 'priority-' . $task_priority;
+                                            $mail->Body .= '
+                                                <p><strong>Priority:</strong> <span class="' . $priority_class . '">' . ucfirst($task_priority) . '</span></p>
+                                                <p><strong>Due Date:</strong> ' . $due_date_display . '</p>
+                                                <p><strong>Project:</strong> ' . htmlspecialchars($project['title']) . '</p>
+                                                <p><strong>Supervisor:</strong> ' . htmlspecialchars($project['supervisor_name']) . '</p>
+                                            </div>
+                                            
+                                            <p style="text-align: center;">
+                                                <a href="http://' . $_SERVER['HTTP_HOST'] . '/project_detail.php?id=' . $project_id . '" class="btn">
+                                                    View Task in TaskBoard
+                                                </a>
+                                            </p>
+                                            
+                                            <p>Please log in to your TaskBoard account to view and update this task.</p>
+                                        </div>
+                                        <div class="footer">
+                                            <p>This is an automated notification from TaskBoard.</p>
+                                            <p>Please do not reply to this email.</p>
+                                        </div>
+                                    </div>
+                                </body>
+                                </html>
+                            ';
+                            
+                            // Plain text version
+                            $mail->AltBody = "New Task Assigned\n\n" .
+                                            "Hello " . $assignee['username'] . ",\n\n" .
+                                            "You have been assigned a new task in the project: " . $project['title'] . "\n\n" .
+                                            "Task: " . $task_title . "\n" .
+                                            (!empty($task_description) ? "Description: " . $task_description . "\n" : "") .
+                                            "Priority: " . ucfirst($task_priority) . "\n" .
+                                            "Due Date: " . $due_date_display . "\n" .
+                                            "Project: " . $project['title'] . "\n" .
+                                            "Supervisor: " . $project['supervisor_name'] . "\n\n" .
+                                            "Log in to your TaskBoard account to view and update this task.\n" .
+                                            "URL: http://" . $_SERVER['HTTP_HOST'] . "/project_detail.php?id=" . $project_id . "\n\n" .
+                                            "This is an automated notification from TaskBoard.";
+                            
+                            // Send email
+                            $mail->send();
+                            
+                            // Clear addresses for next recipient
+                            $mail->clearAddresses();
+                        }
+                        
+                    } catch (Exception $e) {
+                        // Log email error but don't stop task creation
+                        error_log("Email sending failed: " . $mail->ErrorInfo);
+                        // Optionally, you can add a notification about email failure
+                        // $email_error = "Task created but email notification failed: " . $mail->ErrorInfo;
                     }
                 }
                 
@@ -104,10 +286,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_task']) && $is_
                            VALUES ('$task_id', '$user_id', 'Task created')";
                 mysqli_query($conn, $log_sql);
                 
-                $success = "Task created successfully!";
+                $success = "Task created successfully!" . 
+                          (!empty($assignee_emails) ? " Email notifications sent to " . count($assignee_emails) . " assignee(s)." : "");
+                
                 // Refresh to show the new task
                 header("Location: project_detail.php?id=$project_id&manage=true");
                 exit();
+                
             } else {
                 $error = "Error creating task: " . mysqli_error($conn);
             }
@@ -430,7 +615,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_project']) && $
 }
 
 // Get ALL project members INCLUDING SUPERVISOR for task assignment AND management
-$members_sql = "SELECT u.id as user_id, u.username, 
+$members_sql = "SELECT u.id as user_id, u.username, u.email,
                 CASE 
                     WHEN u.id = '" . $project['supervisor_id'] . "' THEN 'supervisor'
                     ELSE COALESCE(pm.role, 'general') 
